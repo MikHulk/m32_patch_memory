@@ -14,11 +14,7 @@ main =
     Browser.element
         { init =
             \_ ->
-                ( { state = DoesNothing
-                  , device = mother32
-                  }
-                , Cmd.none
-                )
+                ( mother32, Cmd.none )
         , update = update
         , subscriptions = \_ -> Sub.none
         , view = view
@@ -29,9 +25,10 @@ mother32 : Device
 mother32 =
     { knobs =
         [ { value = 0
-          , position = ( 81, 58 )
+          , position = ( 81, 57 )
           , boundTo = Frequency
           , geo = Nothing
+          , isMoving = False
           }
         ]
     }
@@ -42,14 +39,7 @@ mother32 =
 
 
 type alias Model =
-    { state : AppState
-    , device : Device
-    }
-
-
-type AppState
-    = Moving Parameter
-    | DoesNothing
+    Device
 
 
 type alias Position =
@@ -61,6 +51,7 @@ type alias Knob =
     , position : Position
     , boundTo : Parameter
     , geo : Maybe BoundingClientRect
+    , isMoving : Bool
     }
 
 
@@ -103,61 +94,64 @@ type Parameter
 
 type Msg
     = UserMoveKnob Parameter
-    | UserStopMoving
-    | UserChangePosition Position
+    | UserStopMovingKnob Parameter
+    | UserChangePosition Parameter Position
     | GotRect BoundingClientRect
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UserMoveKnob knob ->
-            ( { model | state = Moving knob }, Cmd.none )
+        UserMoveKnob param ->
+            let
+                knobs =
+                    updateKnob
+                        model.knobs
+                        param
+                        (\knob -> { knob | isMoving = True })
+            in
+            ( { model | knobs = knobs }, Cmd.none )
 
-        UserChangePosition pos ->
-            case model.state of
-                Moving param ->
+        UserChangePosition param pos ->
+            case getKnob param model.knobs of
+                Just knob ->
                     let
-                        knobs =
-                            updateKnob
-                                model.device.knobs
-                                param
-                                (\knob ->
-                                    case posToValue knob pos of
-                                        Just value ->
-                                            { knob | value = value }
+                        f : Knob -> Knob
+                        f knob_ =
+                            case posToValue knob_ pos of
+                                Just value ->
+                                    { knob_ | value = value }
 
-                                        _ ->
-                                            knob
-                                )
-
-                        device =
-                            model.device
+                                _ ->
+                                    knob_
+                        knobs = updateKnob model.knobs knob.boundTo f
                     in
-                    ( { model | device = { device | knobs = knobs } }, Cmd.none )
+                    ( { model | knobs = knobs }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        UserStopMoving ->
-            ( { model | state = DoesNothing }, Cmd.none )
+        UserStopMovingKnob param ->
+            let
+                knobs =
+                    updateKnob
+                        model.knobs
+                        param
+                        (\knob -> { knob | isMoving = False })
+            in
+            ( { model | knobs = knobs }, Cmd.none )
 
         GotRect rect ->
-            case model.state of
-                Moving param ->
+            case findKnob (\knob -> knob.isMoving) model.knobs of
+                Just knob ->
                     let
                         knobs =
                             updateKnob
-                                model.device.knobs
-                                param
-                                (\knob -> { knob | geo = Just rect })
-
-                        device =
-                            model.device
+                                model.knobs
+                                knob.boundTo
+                                (\knob_ -> { knob_ | geo = Just rect })
                     in
-                    ( { model | device = { device | knobs = knobs } }
-                    , Cmd.none
-                    )
+                    ( { model | knobs = knobs }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -178,7 +172,7 @@ view model =
                 []
 
         knobsSvg =
-            List.map (knobView model) model.device.knobs
+            List.map knobView model.knobs
     in
     Html.div []
         [ Html.h1 [] [ Html.text "Mother 32 Patch Memory" ]
@@ -187,42 +181,30 @@ view model =
             , SvgE.on "mousedown" getBoundingClientRect
             ]
             (devicePicture :: knobsSvg)
-        , Html.p [] [ debugMouseView model ]
+        , Html.p [] [ debugView model ]
         ]
 
 
-debugMouseView : Model -> Html.Html Msg
-debugMouseView model =
-    case model.state of
-        Moving param ->
-            let
-                knobValueHtml =
-                    case getKnob model param of
-                        Just knob ->
-                            Html.text <| String.fromFloat knob.value
+debugView : Model -> Html.Html Msg
+debugView model =
+    case findKnob (\knob -> knob.isMoving) model.knobs of
+        Just knob ->
+            Html.div []
+                [ Html.text <|
+                    Debug.toString knob.boundTo
+                        ++ ": "
+                        ++ String.fromFloat knob.value
+                ]
 
-                        _ ->
-                            Html.text "no value"
-            in
-            Html.div [] [ Html.text <| Debug.toString param ++ ": ", knobValueHtml ]
-
-        DoesNothing ->
+        _ ->
             Html.text "Knob not mooving"
 
 
-knobView : Model -> Knob -> Svg.Svg Msg
-knobView model knob =
+knobView : Knob -> Svg.Svg Msg
+knobView knob =
     let
         ( cx, cy ) =
             knob.position
-
-        isMoving =
-            case model.state of
-                Moving value ->
-                    value == knob.boundTo
-
-                _ ->
-                    False
 
         base =
             [ Svg.defs []
@@ -244,7 +226,7 @@ knobView model knob =
             , Svg.circle
                 [ SvgA.cx <| String.fromFloat cx
                 , SvgA.cy <| String.fromFloat cy
-                , SvgA.r "35"
+                , SvgA.r "34"
                 , SvgA.opacity "0.0"
                 , SvgE.onMouseDown <| UserMoveKnob knob.boundTo
                 ]
@@ -252,7 +234,7 @@ knobView model knob =
             ]
 
         children =
-            if isMoving then
+            if knob.isMoving then
                 base
                     ++ [ Svg.circle
                             [ SvgA.cx <| String.fromFloat cx
@@ -270,9 +252,9 @@ knobView model knob =
                             , SvgA.cy <| String.fromFloat cy
                             , SvgA.r "35"
                             , SvgA.opacity "0.0"
-                            , SvgE.onMouseUp UserStopMoving
-                            , SvgE.onMouseOut UserStopMoving
-                            , onMove UserChangePosition
+                            , SvgE.onMouseUp (UserStopMovingKnob knob.boundTo)
+                            , SvgE.onMouseOut (UserStopMovingKnob knob.boundTo)
+                            , onMove (UserChangePosition knob.boundTo)
                             ]
                             []
                        ]
@@ -287,9 +269,9 @@ knobView model knob =
 -- SVG Event
 
 
-onMove : msg -> Svg.Attribute Msg
-onMove message =
-    SvgE.on "mousemove" positionDecoder
+onMove : (Position -> Msg) -> Svg.Attribute Msg
+onMove msg =
+    SvgE.on "mousemove" (positionDecoder msg)
 
 
 
@@ -315,23 +297,29 @@ boundingClientRectDecoder =
         (Json.Decode.field "left" Json.Decode.float)
 
 
-positionDecoder : Json.Decode.Decoder Msg
-positionDecoder =
+positionDecoder : (Position -> Msg) -> Json.Decode.Decoder Msg
+positionDecoder msg =
     Json.Decode.map2 Tuple.pair
         (Json.Decode.field "screenX" Json.Decode.float)
         (Json.Decode.field "screenY" Json.Decode.float)
-        |> Json.Decode.map UserChangePosition
+        |> Json.Decode.map msg
 
 
 
 -- Utils
 
 
-getKnob : Model -> Parameter -> Maybe Knob
-getKnob model param =
+getKnob : Parameter -> List Knob -> Maybe Knob
+getKnob param knobs =
     List.filter
         (\knob -> knob.boundTo == param)
-        model.device.knobs
+        knobs
+        |> List.head
+
+
+findKnob : (Knob -> Bool) -> List Knob -> Maybe Knob
+findKnob f knobs =
+    List.filter f knobs
         |> List.head
 
 
@@ -348,8 +336,8 @@ updateKnob knobs param f =
         knobs
 
 
-frameRotation : Float -> Float -> Float
-frameRotation rota angle =
+rotate : Float -> Float -> Float
+rotate rota angle =
     let
         angle_ =
             angle - rota
@@ -388,20 +376,20 @@ angleToValue angle =
 
 
 posToValue : Knob -> Position -> Maybe Float
-posToValue knob pos =
+posToValue knob (mouseX, mouseY) =
     let
         geoOpt =
             Maybe.map
-                (\schemaGeo ->
-                    ( schemaGeo.x + schemaGeo.width / 2.0
-                    , schemaGeo.y + schemaGeo.height / 2.0
+                (\geo ->
+                    ( geo.x + geo.width / 2.0
+                    , geo.y + geo.height / 2.0
                     )
                 )
                 knob.geo
 
         posFromCenter =
-            case ( geoOpt, pos ) of
-                ( Just ( knobCenterX, knobCenterY ), ( mouseX, mouseY ) ) ->
+            case geoOpt of
+                Just ( knobCenterX, knobCenterY ) ->
                     Just ( mouseX - knobCenterX, -(mouseY - knobCenterY) )
 
                 _ ->
@@ -412,4 +400,4 @@ posToValue knob pos =
                 (\( x, y ) -> atan2 y x)
                 posFromCenter
     in
-    Maybe.map (frameRotation -2.03 >> toClockWise >> angleToValue) angle
+    Maybe.map (rotate -2.03 >> toClockWise >> angleToValue) angle
