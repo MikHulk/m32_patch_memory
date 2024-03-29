@@ -1,0 +1,31 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>M32 memory</title>
+    <script src="main.js"></script>
+  </head>
+
+  <body>
+    <div id="app"></div>
+    <script>
+      
+      // Patch the `Element` prototype so we can access the bounding client rect
+      // through a decoder. This uses a computed property to call the actual
+      // getBoundingClientRect method automagically.
+      Object.defineProperty(Element.prototype, 'boundingClientRect', {
+        configurable: false,
+        enumerable: true,
+        get() {
+          console.log(this)
+          return this.getBoundingClientRect()
+        }
+      });
+      
+      var app = Elm.Main.init({
+        node: document.getElementById('app')
+      });
+      
+    </script>
+    
+  </body>
+</html>
