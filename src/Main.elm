@@ -1,14 +1,12 @@
 module Main exposing (..)
 
 import Browser
-import Browser.Dom exposing (Viewport, getViewport)
 import Html
 import Html.Events as HtmlE
 import Json.Decode exposing (Decoder)
 import Svg
 import Svg.Attributes as SvgA
 import Svg.Events as SvgE
-import Task
 
 
 main : Program () Model Msg
@@ -37,6 +35,10 @@ mother32 =
           }
         ]
     }
+
+
+
+-- Model
 
 
 type alias Model =
@@ -95,6 +97,10 @@ type Parameter
     | VcMix
 
 
+
+-- Update
+
+
 type Msg
     = UserMoveKnob Parameter
     | UserStopMoving
@@ -111,17 +117,24 @@ update msg model =
         UserChangePosition pos ->
             case model.state of
                 Moving param ->
-                    let knobs =
+                    let
+                        knobs =
                             updateKnob
-                                model.device.knobs param
-                                ( \knob -> 
-                                     case posToValue knob pos of
-                                         Just value -> { knob | value = value }
-                                         _ -> knob
+                                model.device.knobs
+                                param
+                                (\knob ->
+                                    case posToValue knob pos of
+                                        Just value ->
+                                            { knob | value = value }
+
+                                        _ ->
+                                            knob
                                 )
-                        device = model.device
+
+                        device =
+                            model.device
                     in
-                        ({model | device = { device | knobs = knobs}}, Cmd.none)
+                    ( { model | device = { device | knobs = knobs } }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -132,13 +145,17 @@ update msg model =
         GotRect rect ->
             case model.state of
                 Moving param ->
-                    let knobs =
+                    let
+                        knobs =
                             updateKnob
-                                model.device.knobs param
-                                (\knob -> {knob | geo = Just rect})
-                        device = model.device
+                                model.device.knobs
+                                param
+                                (\knob -> { knob | geo = Just rect })
+
+                        device =
+                            model.device
                     in
-                    ( { model | device = { device | knobs = knobs}}
+                    ( { model | device = { device | knobs = knobs } }
                     , Cmd.none
                     )
 
@@ -281,8 +298,6 @@ onMove message =
 
 getBoundingClientRect : Decoder Msg
 getBoundingClientRect =
-    -- The bounding client rect exists on an event's *target*. That's the
-    -- element that triggered the event.
     Json.Decode.at [ "target", "boundingClientRect" ] boundingClientRectDecoder
         |> Json.Decode.map GotRect
 
@@ -302,11 +317,10 @@ boundingClientRectDecoder =
 
 positionDecoder : Json.Decode.Decoder Msg
 positionDecoder =
-    Json.Decode.map UserChangePosition
-        (Json.Decode.map2 Tuple.pair
-            (Json.Decode.field "screenX" Json.Decode.float)
-            (Json.Decode.field "screenY" Json.Decode.float)
-        )
+    Json.Decode.map2 Tuple.pair
+        (Json.Decode.field "screenX" Json.Decode.float)
+        (Json.Decode.field "screenY" Json.Decode.float)
+        |> Json.Decode.map UserChangePosition
 
 
 
