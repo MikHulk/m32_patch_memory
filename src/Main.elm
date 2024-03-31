@@ -24,9 +24,87 @@ main =
 mother32 : Device
 mother32 =
     { knobs =
-        [ { value = 0
-          , position = ( 81, 57 )
+        [ { value = 0.505
+          , position = ( 80.7, 57.4 )
           , boundTo = Frequency
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 247.6, 57.4 )
+          , boundTo = PulseWidth
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 331, 57.4 )
+          , boundTo = Mix
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 431.5, 57.4 )
+          , boundTo = Cutoff
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 532.5, 57.4 )
+          , boundTo = Resonance
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 665, 57.4 )
+          , boundTo = Volume
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 80.8, 140.2 )
+          , boundTo = Glide
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 247.6, 140.2 )
+          , boundTo = VcoModAmount
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 581, 140.2 )
+          , boundTo = VcfModAmount
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 135.8, 223.55 )
+          , boundTo = TempoGate
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 247.8, 223.55 )
+          , boundTo = LfoRate
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 414.5, 223.55 )
+          , boundTo = Attack
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 581, 223.55 )
+          , boundTo = Decay
+          , geo = Nothing
+          , isMoving = False
+          }
+        , { value = 0.505
+          , position = ( 665, 223.55 )
+          , boundTo = VcMix
           , geo = Nothing
           , isMoving = False
           }
@@ -189,12 +267,33 @@ debugView : Model -> Html.Html Msg
 debugView model =
     case findKnob (\knob -> knob.isMoving) model.knobs of
         Just knob ->
-            Html.div []
-                [ Html.text <|
-                    Debug.toString knob.boundTo
-                        ++ ": "
-                        ++ String.fromFloat knob.value
-                ]
+            let
+                ( cx, cy ) =
+                    knob.position
+                        
+                knobAngle =
+                    (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
+
+                ( x1, y1 ) =
+                    fromPolar (36.0, knobAngle)
+                
+                ( x2, y2 ) =
+                    fromPolar (16.0, knobAngle)
+            in
+                Html.div []
+                    [ Html.p []
+                          [ Html.text <|
+                                Debug.toString knob.boundTo
+                                ++ ": "
+                                ++ String.fromFloat knob.value
+                          ]
+                    , Html.p []
+                          [ Html.text <|
+                                Debug.toString (x1, y1)
+                                ++ ": "
+                                ++ Debug.toString (x2, y2)
+                          ]
+                    ]
 
         _ ->
             Html.text "Knob not mooving"
@@ -206,6 +305,15 @@ knobView knob =
         ( cx, cy ) =
             knob.position
 
+        knobAngle =
+            (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
+
+        ( x1, y1 ) =
+            fromPolar (36.0, knobAngle)
+                
+        ( x2, y2 ) =
+            fromPolar (16.0, knobAngle)
+                
         base =
             [ Svg.defs []
                 [ Svg.filter [ SvgA.id "blur" ]
@@ -215,10 +323,10 @@ knobView knob =
                     ]
                 ]
             , Svg.line
-                [ SvgA.x1 <| String.fromFloat cx
-                , SvgA.y1 <| String.fromFloat <| cy - 16.0
-                , SvgA.x2 <| String.fromFloat <| cx
-                , SvgA.y2 <| String.fromFloat <| cy - 36.0
+                [ SvgA.x1 <| String.fromFloat (cx + x1)
+                , SvgA.y1 <| String.fromFloat (cy - y1)
+                , SvgA.x2 <| String.fromFloat (cx + x2)
+                , SvgA.y2 <| String.fromFloat (cy - y2)
                 , SvgA.stroke "red"
                 , SvgA.strokeWidth "3"
                 ]
@@ -352,7 +460,7 @@ rotate rota angle =
 toClockWise : Float -> Float
 toClockWise angle =
     if angle < 0 then
-        abs angle
+        -angle
 
     else
         2 * pi - angle
@@ -362,7 +470,7 @@ angleToValue : Float -> Float
 angleToValue angle =
     let
         x =
-            1.18 * angle / (2 * pi)
+            (1 / 0.85) * angle / (2 * pi)
     in
     if x > 1.0 then
         if x < 1.09 then
@@ -373,6 +481,20 @@ angleToValue angle =
 
     else
         x
+
+
+valueToAngle : Float -> Float
+valueToAngle value =
+    value * 0.85 * (2 * pi)
+
+
+fromClockWise : Float -> Float
+fromClockWise angle =
+    if angle < pi then
+        -angle
+
+    else
+        2 * pi - angle
 
 
 posToValue : Knob -> Position -> Maybe Float
