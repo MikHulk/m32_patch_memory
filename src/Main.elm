@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Browser
 import Html
+import Html.Attributes as HtmlA
 import Html.Events as HtmlE
 import Json.Decode exposing (Decoder)
 import Svg
@@ -202,7 +203,9 @@ update msg model =
 
                                 _ ->
                                     knob_
-                        knobs = updateKnob model.knobs knob.boundTo f
+
+                        knobs =
+                            updateKnob model.knobs knob.boundTo f
                     in
                     ( { model | knobs = knobs }, Cmd.none )
 
@@ -253,50 +256,71 @@ view model =
             List.map knobView model.knobs
     in
     Html.div []
-        [ Html.h1 [] [ Html.text "Mother 32 Patch Memory" ]
+        [ Html.h1 [ HtmlA.id "header"] [ Html.text "Mother 32 Patch Memory" ]
         , Svg.svg
             [ SvgA.viewBox "0 0 900 380"
             , SvgE.on "mousedown" getBoundingClientRect
             ]
-            (devicePicture :: knobsSvg)
+            ( devicePicture
+            :: ( Svg.rect
+                     [ SvgA.width "900"
+                     , SvgA.height "380"
+                     , SvgA.fill "#86A"
+                     , SvgA.opacity "0.1"
+                     , SvgA.x "0"
+                     , SvgA.y "0"
+                     ] []
+               :: knobsSvg
+               )
+            )
         , Html.p [] [ debugView model ]
         ]
 
 
 debugView : Model -> Html.Html Msg
 debugView model =
-    case findKnob (\knob -> knob.isMoving) model.knobs of
-        Just knob ->
-            let
-                ( cx, cy ) =
-                    knob.position
-                        
-                knobAngle =
-                    (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
+    Html.div
+        [ HtmlA.style "background-color" "#FFEEEE"
+        , HtmlA.style "padding" "0.5em"
+        ]
+    <|
+        case findKnob (\knob -> knob.isMoving) model.knobs of
+            Just knob ->
+                let
+                    ( cx, cy ) =
+                        knob.position
 
-                ( x1, y1 ) =
-                    fromPolar (36.0, knobAngle)
-                
-                ( x2, y2 ) =
-                    fromPolar (16.0, knobAngle)
-            in
-                Html.div []
-                    [ Html.p []
-                          [ Html.text <|
-                                Debug.toString knob.boundTo
-                                ++ ": "
-                                ++ String.fromFloat knob.value
-                          ]
-                    , Html.p []
-                          [ Html.text <|
-                                Debug.toString (x1, y1)
-                                ++ ": "
-                                ++ Debug.toString (x2, y2)
-                          ]
+                    knobAngle =
+                        (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
+
+                    ( x1, y1 ) =
+                        fromPolar ( 36.0, knobAngle )
+
+                    ( x2, y2 ) =
+                        fromPolar ( 16.0, knobAngle )
+                in
+                [ Html.p []
+                    [ Html.text <|
+                        Debug.toString knob.boundTo
+                            ++ ": "
+                            ++ String.fromFloat knob.value
                     ]
+                , Html.p []
+                    [ Html.text <|
+                        Debug.toString
+                            ( (toFloat <| round (x1 * 10000.0)) / 10000.0
+                            , (toFloat <| round (y1 * 10000.0)) / 10000.0
+                            )
+                            ++ ": "
+                            ++ Debug.toString
+                                ( (toFloat <| round (x2 * 10000.0)) / 10000.0
+                                , (toFloat <| round (y2 * 10000.0)) / 10000.0
+                                )
+                    ]
+                ]
 
-        _ ->
-            Html.text "Knob not mooving"
+            _ ->
+                [ Html.text "Knob not mooving" ]
 
 
 knobView : Knob -> Svg.Svg Msg
@@ -309,11 +333,11 @@ knobView knob =
             (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
 
         ( x1, y1 ) =
-            fromPolar (36.0, knobAngle)
-                
+            fromPolar ( 36.0, knobAngle )
+
         ( x2, y2 ) =
-            fromPolar (16.0, knobAngle)
-                
+            fromPolar ( 16.0, knobAngle )
+
         base =
             [ Svg.defs []
                 [ Svg.filter [ SvgA.id "blur" ]
@@ -327,7 +351,7 @@ knobView knob =
                 , SvgA.y1 <| String.fromFloat (cy - y1)
                 , SvgA.x2 <| String.fromFloat (cx + x2)
                 , SvgA.y2 <| String.fromFloat (cy - y2)
-                , SvgA.stroke "red"
+                , SvgA.stroke "#C56"
                 , SvgA.strokeWidth "3"
                 ]
                 []
@@ -498,7 +522,7 @@ fromClockWise angle =
 
 
 posToValue : Knob -> Position -> Maybe Float
-posToValue knob (mouseX, mouseY) =
+posToValue knob ( mouseX, mouseY ) =
     let
         geoOpt =
             Maybe.map
