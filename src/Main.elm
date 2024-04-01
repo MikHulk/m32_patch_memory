@@ -37,19 +37,19 @@ mother32 =
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.01
           , position = ( 331, 57.4 )
           , boundTo = Mix
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.99
           , position = ( 431.5, 57.4 )
           , boundTo = Cutoff
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.307
           , position = ( 532.5, 57.4 )
           , boundTo = Resonance
           , geo = Nothing
@@ -61,13 +61,13 @@ mother32 =
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.01
           , position = ( 80.8, 140.2 )
           , boundTo = Glide
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.01
           , position = ( 247.6, 140.2 )
           , boundTo = VcoModAmount
           , geo = Nothing
@@ -91,7 +91,7 @@ mother32 =
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.01
           , position = ( 414.5, 223.55 )
           , boundTo = Attack
           , geo = Nothing
@@ -103,7 +103,7 @@ mother32 =
           , geo = Nothing
           , isMoving = False
           }
-        , { value = 0.505
+        , { value = 0.01
           , position = ( 665, 223.55 )
           , boundTo = VcMix
           , geo = Nothing
@@ -345,8 +345,8 @@ view model =
             :: ( Svg.rect
                      [ SvgA.width "900"
                      , SvgA.height "380"
-                     , SvgA.fill "#86A"
-                     , SvgA.opacity "0.1"
+                     , SvgA.fill "#AAF"
+                     , SvgA.opacity "0.17"
                      , SvgA.x "0"
                      , SvgA.y "0"
                      ] []
