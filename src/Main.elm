@@ -110,6 +110,44 @@ mother32 =
           , isMoving = False
           }
         ]
+    , switches =
+        [ { direction = Up
+          , position = ( 164.75, 57.76 )
+          , boundTo = VcoWave
+          }
+        , { direction = Down
+          , position = ( 601.7, 57.76 )
+          , boundTo = VcaMode
+          }
+        , { direction = Up
+          , position = ( 164.75, 140.2 )
+          , boundTo = VcoModSource
+          }
+        , { direction = Up
+          , position = ( 331.5, 140.2 )
+          , boundTo = VcoModDest
+          }
+        , { direction = Down
+          , position = ( 414.5, 140.2 )
+          , boundTo = VcfMode
+          }
+        , { direction = Up
+          , position = ( 498.5, 140.2 )
+          , boundTo = VcfModSource
+          }
+        , { direction = Up
+          , position = ( 665, 140.2 )
+          , boundTo = VcfModPolarity
+          }
+        , { direction = Down
+          , position = ( 331.5, 223.55 )
+          , boundTo = LfoWave
+          }
+        , { direction = Down
+          , position = ( 498.5, 223.55 )
+          , boundTo = Sustain
+          }
+        ]
     }
 
 
@@ -134,6 +172,13 @@ type alias Knob =
     }
 
 
+type alias Switch =
+    { direction : Direction
+    , position : Position
+    , boundTo : Parameter
+    }
+
+
 type alias BoundingClientRect =
     { x : Float
     , y : Float
@@ -147,7 +192,14 @@ type alias BoundingClientRect =
 
 
 type alias Device =
-    { knobs : List Knob }
+    { knobs : List Knob
+    , switches: List Switch
+    }
+
+
+type Direction
+    = Up
+    | Down
 
 
 type Parameter
@@ -165,7 +217,15 @@ type Parameter
     | Attack
     | Decay
     | VcMix
-
+    | VcoWave
+    | VcaMode
+    | VcoModSource
+    | VcoModDest
+    | VcfMode
+    | VcfModSource
+    | VcfModPolarity
+    | LfoWave
+    | Sustain
 
 
 -- Update
@@ -173,6 +233,7 @@ type Parameter
 
 type Msg
     = UserMoveKnob Parameter
+    | UserSetSwitch Parameter
     | UserStopMovingKnob Parameter
     | UserChangePosition Parameter Position
     | GotRect BoundingClientRect
@@ -190,6 +251,22 @@ update msg model =
                         (\knob -> { knob | isMoving = True })
             in
             ( { model | knobs = knobs }, Cmd.none )
+                
+        UserSetSwitch param ->
+            let
+                switches =
+                    updateSwitch
+                        model.switches
+                        param
+                        (\switch ->
+                             case switch.direction of
+                                 Up ->
+                                     { switch | direction = Down }
+                                 Down ->
+                                     { switch | direction = Up }
+                        )
+            in
+            ( { model | switches = switches }, Cmd.none )
 
         UserChangePosition param pos ->
             case getKnob param model.knobs of
@@ -254,6 +331,9 @@ view model =
 
         knobsSvg =
             List.map knobView model.knobs
+
+        switchesSvg =
+            List.map switchView model.switches
     in
     Html.div []
         [ Html.h1 [ HtmlA.id "header"] [ Html.text "Mother 32 Patch Memory" ]
@@ -270,7 +350,7 @@ view model =
                      , SvgA.x "0"
                      , SvgA.y "0"
                      ] []
-               :: knobsSvg
+               :: (knobsSvg ++ switchesSvg)
                )
             )
         , Html.p [] [ debugView model ]
@@ -322,6 +402,40 @@ debugView model =
             _ ->
                 [ Html.text "Knob not mooving" ]
 
+
+
+switchView : Switch -> Svg.Svg Msg
+switchView switch =
+    let (cx, cy) = switch.position
+        offset =
+            case switch.direction of
+                Up -> -5
+                Down -> 5
+                     
+    in
+        Svg.g
+            [ SvgE.onMouseDown <| UserSetSwitch switch.boundTo
+            ]
+            [ Svg.circle
+                  [ SvgA.cx <| String.fromFloat cx
+                  , SvgA.cy <| String.fromFloat cy
+                  , SvgA.r "2"
+                  , SvgA.opacity "1.0"
+                  , SvgA.fill "#C56"
+                  ]
+                  []
+            , Svg.circle
+                  [ SvgA.cx <| String.fromFloat cx
+                  , SvgA.cy <| String.fromFloat (cy + offset)
+                  , SvgA.r "4"
+                  , SvgA.opacity "1.0"
+                  , SvgA.stroke "black"
+                  , SvgA.strokeWidth "0.5"
+                  , SvgA.fill "#C56"
+                  ]
+                  [] 
+            ]
+        
 
 knobView : Knob -> Svg.Svg Msg
 knobView knob =
@@ -457,6 +571,19 @@ findKnob f knobs =
 
 updateKnob : List Knob -> Parameter -> (Knob -> Knob) -> List Knob
 updateKnob knobs param f =
+    List.map
+        (\knob ->
+            if knob.boundTo == param then
+                f knob
+
+            else
+                knob
+        )
+        knobs
+
+
+updateSwitch : List Switch -> Parameter -> (Switch -> Switch) -> List Switch
+updateSwitch knobs param f =
     List.map
         (\knob ->
             if knob.boundTo == param then
