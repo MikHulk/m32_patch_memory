@@ -148,6 +148,96 @@ mother32 =
           , boundTo = Sustain
           }
         ]
+    , inputs =
+          [ { position = (729.5, 41)
+            , boundTo = ExtAudio
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (769, 41)
+            , boundTo = MixCv
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (809, 41)
+            , boundTo = VcaCv
+            , geo = Nothing
+            , isSelected = False
+            }
+          ]
+    , outputs =
+          [ { position = (847, 41)
+            , boundTo = Vca
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (729.5, 80)
+            , boundTo = Noise
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 80)
+            , boundTo = Vcf
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (807.7, 119)
+            , boundTo = VcoSaw
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 119)
+            , boundTo = VcoPulse
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (807.7, 157)
+            , boundTo = LfoTri
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 157)
+            , boundTo = LfoSq
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 196)
+            , boundTo = VcMixOut
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (769, 235)
+            , boundTo = Mult1
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (808, 235)
+            , boundTo = Mult2
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 235)
+            , boundTo = Assign
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (769, 273.7)
+            , boundTo = Eg
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (808, 273.7)
+            , boundTo = Kb
+            , geo = Nothing
+            , isSelected = False
+            }
+          , { position = (847, 273.7)
+            , boundTo = GateOut
+            , geo = Nothing
+            , isSelected = False
+            }
+          ]
+    , patches = []
     }
 
 
@@ -159,13 +249,9 @@ type alias Model =
     Device
 
 
-type alias Position =
-    ( Float, Float )
-
-
 type alias Knob =
     { value : Float
-    , position : Position
+    , position : (Float, Float)
     , boundTo : Parameter
     , geo : Maybe BoundingClientRect
     , isMoving : Bool
@@ -174,10 +260,23 @@ type alias Knob =
 
 type alias Switch =
     { direction : Direction
-    , position : Position
+    , position : ( Float, Float )
     , boundTo : Parameter
     }
 
+type alias JackIn =
+    { boundTo : Input
+    , position : (Float, Float)
+    , geo:  Maybe BoundingClientRect
+    , isSelected: Bool
+    }
+
+type alias JackOut =
+    { boundTo : Output
+    , position : (Float, Float)
+    , geo:  Maybe BoundingClientRect
+    , isSelected: Bool
+    }
 
 type alias BoundingClientRect =
     { x : Float
@@ -193,7 +292,10 @@ type alias BoundingClientRect =
 
 type alias Device =
     { knobs : List Knob
-    , switches: List Switch
+    , switches : List Switch
+    , inputs : List JackIn
+    , outputs : List JackOut
+    , patches: List (Input, Output)
     }
 
 
@@ -228,6 +330,44 @@ type Parameter
     | Sustain
 
 
+type Output
+    = Vca
+    | Noise
+    | Vcf
+    | VcoSaw
+    | VcoPulse
+    | LfoTri
+    | LfoSq
+    | VcMixOut
+    | Mult1
+    | Mult2
+    | Assign
+    | Eg
+    | Kb
+    | GateOut
+
+type Input
+    = ExtAudio
+    | MixCv
+    | VcaCv
+    | VcfCutoff
+    | VcfRes
+    | Vco1vOct
+    | VcoLinFm
+    | VcoMod
+    | LfoRateIn
+    | Mix1
+    | Mix2
+    | VcMixCtrl
+    | Mult
+    | GateIn
+    | Tempo
+    | RunStop
+    | Reset
+    | Hold
+
+
+
 -- Update
 
 
@@ -235,7 +375,7 @@ type Msg
     = UserMoveKnob Parameter
     | UserSetSwitch Parameter
     | UserStopMovingKnob Parameter
-    | UserChangePosition Parameter Position
+    | UserChangePosition Parameter (Float, Float)
     | GotRect BoundingClientRect
 
 
@@ -251,7 +391,7 @@ update msg model =
                         (\knob -> { knob | isMoving = True })
             in
             ( { model | knobs = knobs }, Cmd.none )
-                
+
         UserSetSwitch param ->
             let
                 switches =
@@ -259,11 +399,12 @@ update msg model =
                         model.switches
                         param
                         (\switch ->
-                             case switch.direction of
-                                 Up ->
-                                     { switch | direction = Down }
-                                 Down ->
-                                     { switch | direction = Up }
+                            case switch.direction of
+                                Up ->
+                                    { switch | direction = Down }
+
+                                Down ->
+                                    { switch | direction = Up }
                         )
             in
             ( { model | switches = switches }, Cmd.none )
@@ -334,24 +475,28 @@ view model =
 
         switchesSvg =
             List.map switchView model.switches
+
+        jackOutSvg =
+            List.map jackOutView model.outputs
     in
     Html.div []
-        [ Html.h1 [ HtmlA.id "header"] [ Html.text "Mother 32 Patch Memory" ]
+        [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
         , Svg.svg
             [ SvgA.viewBox "0 0 900 380"
             , SvgE.on "mousedown" getBoundingClientRect
             ]
-            ( devicePicture
-            :: ( Svg.rect
-                     [ SvgA.width "900"
-                     , SvgA.height "380"
-                     , SvgA.fill "#AAF"
-                     , SvgA.opacity "0.17"
-                     , SvgA.x "0"
-                     , SvgA.y "0"
-                     ] []
-               :: (knobsSvg ++ switchesSvg)
-               )
+            (devicePicture
+                :: (Svg.rect
+                        [ SvgA.width "900"
+                        , SvgA.height "380"
+                        , SvgA.fill "#AAF"
+                        , SvgA.opacity "0.17"
+                        , SvgA.x "0"
+                        , SvgA.y "0"
+                        ]
+                        []
+                        :: (knobsSvg ++ switchesSvg ++ jackOutSvg)
+                   )
             )
         , Html.p [] [ debugView model ]
         ]
@@ -404,38 +549,62 @@ debugView model =
 
 
 
-switchView : Switch -> Svg.Svg Msg
-switchView switch =
-    let (cx, cy) = switch.position
-        offset =
-            case switch.direction of
-                Up -> -5
-                Down -> 5
-                     
+jackOutView : JackOut -> Svg.Svg Msg
+jackOutView jack =
+    let
+        ( cx, cy) =
+            jack.position
     in
         Svg.g
-            [ SvgE.onMouseDown <| UserSetSwitch switch.boundTo
+            []
+            [ Svg.rect
+              [ SvgA.width "25"
+              , SvgA.height "25"
+              , SvgA.stroke "red"
+              , SvgA.fill "none"
+              , SvgA.strokeWidth "1"
+              , SvgA.x <| String.fromFloat cx
+              , SvgA.y <| String.fromFloat cy
+              ] []
             ]
-            [ Svg.circle
-                  [ SvgA.cx <| String.fromFloat cx
-                  , SvgA.cy <| String.fromFloat cy
-                  , SvgA.r "2"
-                  , SvgA.opacity "1.0"
-                  , SvgA.fill "#C56"
-                  ]
-                  []
-            , Svg.circle
-                  [ SvgA.cx <| String.fromFloat cx
-                  , SvgA.cy <| String.fromFloat (cy + offset)
-                  , SvgA.r "4"
-                  , SvgA.opacity "1.0"
-                  , SvgA.stroke "black"
-                  , SvgA.strokeWidth "0.5"
-                  , SvgA.fill "#C56"
-                  ]
-                  [] 
+                  
+switchView : Switch -> Svg.Svg Msg
+switchView switch =
+    let
+        ( cx, cy ) =
+            switch.position
+
+        offset =
+            case switch.direction of
+                Up ->
+                    -5
+
+                Down ->
+                    5
+    in
+    Svg.g
+        [ SvgE.onMouseDown <| UserSetSwitch switch.boundTo
+        ]
+        [ Svg.circle
+            [ SvgA.cx <| String.fromFloat cx
+            , SvgA.cy <| String.fromFloat cy
+            , SvgA.r "2"
+            , SvgA.opacity "1.0"
+            , SvgA.fill "#C56"
             ]
-        
+            []
+        , Svg.circle
+            [ SvgA.cx <| String.fromFloat cx
+            , SvgA.cy <| String.fromFloat (cy + offset)
+            , SvgA.r "4"
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "0.5"
+            , SvgA.fill "#C56"
+            ]
+            []
+        ]
+
 
 knobView : Knob -> Svg.Svg Msg
 knobView knob =
@@ -515,7 +684,7 @@ knobView knob =
 -- SVG Event
 
 
-onMove : (Position -> Msg) -> Svg.Attribute Msg
+onMove : ((Float, Float) -> Msg) -> Svg.Attribute Msg
 onMove msg =
     SvgE.on "mousemove" (positionDecoder msg)
 
@@ -543,7 +712,7 @@ boundingClientRectDecoder =
         (Json.Decode.field "left" Json.Decode.float)
 
 
-positionDecoder : (Position -> Msg) -> Json.Decode.Decoder Msg
+positionDecoder : ((Float, Float) -> Msg) -> Json.Decode.Decoder Msg
 positionDecoder msg =
     Json.Decode.map2 Tuple.pair
         (Json.Decode.field "screenX" Json.Decode.float)
@@ -648,7 +817,7 @@ fromClockWise angle =
         2 * pi - angle
 
 
-posToValue : Knob -> Position -> Maybe Float
+posToValue : Knob -> (Float, Float) -> Maybe Float
 posToValue knob ( mouseX, mouseY ) =
     let
         geoOpt =
