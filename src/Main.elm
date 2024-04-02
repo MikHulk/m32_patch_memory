@@ -265,16 +265,8 @@ type alias Switch =
     }
 
 
-type alias JackIn =
-    { boundTo : Input
-    , position : ( Float, Float )
-    , geo : Maybe BoundingClientRect
-    , isSelected : Bool
-    }
-
-
-type alias JackOut =
-    { boundTo : Output
+type alias Jack =
+    { boundTo : Parameter
     , position : ( Float, Float )
     , geo : Maybe BoundingClientRect
     , isSelected : Bool
@@ -296,9 +288,9 @@ type alias BoundingClientRect =
 type alias Device =
     { knobs : List Knob
     , switches : List Switch
-    , inputs : List JackIn
-    , outputs : List JackOut
-    , patches : List ( Input, Output )
+    , inputs : List Jack
+    , outputs : List Jack
+    , patches : List ( Jack, Jack )
     }
 
 
@@ -331,10 +323,7 @@ type Parameter
     | VcfModPolarity
     | LfoWave
     | Sustain
-
-
-type Output
-    = Vca
+    | Vca
     | Noise
     | Vcf
     | VcoSaw
@@ -348,10 +337,7 @@ type Output
     | Eg
     | Kb
     | GateOut
-
-
-type Input
-    = ExtAudio
+    | ExtAudio
     | MixCv
     | VcaCv
     | VcfCutoff
@@ -380,7 +366,9 @@ type Msg
     | UserSetSwitch Parameter
     | UserStopMovingKnob Parameter
     | UserChangePosition Parameter ( Float, Float )
-    | GotKnobRect BoundingClientRect
+    | GotKnobRect Parameter BoundingClientRect
+    | GotJackOutRect Parameter BoundingClientRect
+    | GotJackInRect Parameter BoundingClientRect
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -444,20 +432,43 @@ update msg model =
             in
             ( { model | knobs = knobs }, Cmd.none )
 
-        GotKnobRect rect ->
-            case findKnob (\knob -> knob.isMoving) model.knobs of
-                Just knob ->
-                    let
-                        knobs =
-                            updateKnob
-                                model.knobs
-                                knob.boundTo
-                                (\knob_ -> { knob_ | geo = Just rect })
-                    in
-                    ( { model | knobs = knobs }, Cmd.none )
+        GotKnobRect param rect ->
+            let
+                knobs =
+                    updateKnob
+                        model.knobs
+                        param
+                        (\knob_ -> { knob_ | geo = Just rect })
+            in
+            ( { model | knobs = knobs }, Cmd.none )
 
-                _ ->
-                    ( model, Cmd.none )
+        GotJackOutRect output rect ->
+            let
+                transform jack_ =
+                    if jack_.boundTo == output then
+                        { jack_ | geo = Just rect, isSelected = True }
+
+                    else
+                        { jack_ | isSelected = False }
+
+                outputs =
+                    List.map transform model.outputs
+            in
+            ( { model | outputs = outputs }, Cmd.none )
+
+        GotJackInRect input rect ->
+            let
+                transform jack_ =
+                    if jack_.boundTo == input then
+                        { jack_ | geo = Just rect, isSelected = True }
+
+                    else
+                        { jack_ | isSelected = False }
+
+                inputs =
+                    List.map transform model.inputs
+            in
+            ( { model | inputs = inputs }, Cmd.none )
 
 
 
@@ -491,7 +502,7 @@ view model =
             List.map switchView model.switches
 
         jackOutSvg =
-            List.map jackOutView model.outputs
+            List.map (jackView GotJackOutRect) model.outputs
     in
     Html.div []
         [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
@@ -553,14 +564,15 @@ debugView model =
                 [ Html.text "Knob not mooving" ]
 
 
-jackOutView : JackOut -> Svg.Svg Msg
-jackOutView jack =
+jackView : (Parameter -> BoundingClientRect -> Msg) -> Jack -> Svg.Svg Msg
+jackView msg jack =
     let
         ( cx, cy ) =
             jack.position
     in
     Svg.g
-        []
+        [ SvgE.on "mousedown" (getBoundingClientRect (msg jack.boundTo))
+        ]
         [ Svg.rect
             [ SvgA.width "25"
             , SvgA.height "25"
@@ -694,7 +706,7 @@ knobView knob =
             else
                 base
     in
-    Svg.g [ SvgE.on "mousedown" (getBoundingClientRect GotKnobRect) ] children
+    Svg.g [ SvgE.on "mousedown" (getBoundingClientRect (GotKnobRect knob.boundTo)) ] children
 
 
 
