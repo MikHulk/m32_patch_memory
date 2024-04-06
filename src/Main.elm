@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import AssocList as Al
 import Browser
 import Html
 import Html.Attributes as HtmlA
@@ -24,6 +25,11 @@ main =
         , subscriptions = \_ -> Sub.none
         , view = view
         }
+
+
+colors : List String
+colors =
+    [ "red", "green", "blue", "gold", "black", "grey" ]
 
 
 mother32 : Device
@@ -284,7 +290,7 @@ mother32 =
           , isSelected = False
           }
         ]
-    , patches = []
+    , patches = Al.empty
     }
 
 
@@ -338,7 +344,7 @@ type alias Device =
     , switches : List Switch
     , inputs : List Jack
     , outputs : List Jack
-    , patches : List ( Parameter, Parameter )
+    , patches : Al.Dict ( Parameter, Parameter ) String
     }
 
 
@@ -417,6 +423,7 @@ type Msg
     | GotKnobRect Parameter BoundingClientRect
     | UserClickJackOut Parameter
     | UserClickJackIn Parameter
+    | UserSelectColor String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -539,13 +546,11 @@ update msg model =
                             jack.boundTo
 
                         patches =
-                            if List.member ( input, output ) device.patches then
-                                List.filter
-                                    (\( inp, out ) -> not <| inp == input && out == output)
-                                    device.patches
+                            if Al.member ( input, output ) device.patches then
+                                Al.remove ( input, output ) device.patches
 
                             else
-                                ( input, output ) :: device.patches
+                                Al.insert ( input, output ) model.selectedColor device.patches
                     in
                     ( { model
                         | device =
@@ -603,13 +608,11 @@ update msg model =
                             jack.boundTo
 
                         patches =
-                            if List.member ( input, output ) device.patches then
-                                List.filter
-                                    (\( inp, out ) -> not <| inp == input && out == output)
-                                    device.patches
+                            if Al.member ( input, output ) device.patches then
+                                Al.remove ( input, output ) device.patches
 
                             else
-                                ( input, output ) :: device.patches
+                                Al.insert ( input, output ) model.selectedColor device.patches
                     in
                     ( { model
                         | device =
@@ -639,6 +642,9 @@ update msg model =
                     in
                     ( { model | device = { device | inputs = inputs } }, Cmd.none )
 
+        UserSelectColor color ->
+            ( { model | selectedColor = color }, Cmd.none )
+
 
 
 -- View
@@ -647,7 +653,9 @@ update msg model =
 view : Model -> Html.Html Msg
 view model =
     let
-        device = model.device
+        device =
+            model.device
+
         devicePicture =
             [ Svg.image
                 [ SvgA.xlinkHref "Mother-32.png"
@@ -663,6 +671,7 @@ view model =
                 , SvgA.y "0"
                 ]
                 []
+            , colorSelectorView
             ]
 
         knobsSvg =
@@ -680,7 +689,8 @@ view model =
         patchSvg =
             List.filterMap
                 (Maybe.map patchView << patchToJack device.inputs device.outputs)
-                device.patches
+            <|
+                Al.toList device.patches
     in
     Html.div []
         [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
@@ -744,8 +754,8 @@ debugView model =
                 [ Html.text "Knob not mooving" ]
 
 
-patchView : ( Jack, Jack ) -> Svg.Svg Msg
-patchView ( jackIn, jackOut ) =
+patchView : ( Jack, Jack, String ) -> Svg.Svg Msg
+patchView ( jackIn, jackOut, color ) =
     let
         ( inX, inY ) =
             jackIn.position
@@ -759,9 +769,28 @@ patchView ( jackIn, jackOut ) =
         , SvgA.x2 <| String.fromFloat (outX + 12.5)
         , SvgA.y2 <| String.fromFloat (outY + 12.5)
         , SvgA.strokeWidth "3"
-        , SvgA.stroke "black"
+        , SvgA.stroke color
         ]
         []
+
+
+colorSelectorView : Svg.Svg Msg
+colorSelectorView =
+    let
+        square id color =
+            Svg.rect
+                [ SvgA.width "7"
+                , SvgA.height "7"
+                , SvgA.stroke "black"
+                , SvgA.fill color
+                , SvgA.strokeWidth "1"
+                , SvgA.x <| String.fromFloat (750.0 + toFloat id * 10.0)
+                , SvgA.y "350.0"
+                , SvgE.onClick <| UserSelectColor color
+                ]
+                []
+    in
+    Svg.g [] <| List.indexedMap square colors
 
 
 jackView : (Parameter -> Msg) -> Jack -> Svg.Svg Msg
@@ -1002,8 +1031,12 @@ findJack f jacks =
         |> List.head
 
 
-patchToJack : List Jack -> List Jack -> ( Parameter, Parameter ) -> Maybe ( Jack, Jack )
-patchToJack inputs outputs ( input, output ) =
+patchToJack :
+    List Jack
+    -> List Jack
+    -> ( ( Parameter, Parameter ), String )
+    -> Maybe ( Jack, Jack, String )
+patchToJack inputs outputs ( ( input, output ), color ) =
     let
         jackIn =
             findJack (\jack -> jack.boundTo == input) inputs
@@ -1011,7 +1044,7 @@ patchToJack inputs outputs ( input, output ) =
         jackOut =
             findJack (\jack -> jack.boundTo == output) outputs
     in
-    Maybe.map2 (\left right -> ( left, right )) jackIn jackOut
+    Maybe.map2 (\left right -> ( left, right, color )) jackIn jackOut
 
 
 updateSwitch : List Switch -> Parameter -> (Switch -> Switch) -> List Switch
