@@ -15,7 +15,11 @@ main =
     Browser.element
         { init =
             \_ ->
-                ( mother32, Cmd.none )
+                ( { device = mother32
+                  , selectedColor = "red"
+                  }
+                , Cmd.none
+                )
         , update = update
         , subscriptions = \_ -> Sub.none
         , view = view
@@ -151,164 +155,132 @@ mother32 =
     , inputs =
         [ { position = ( 729.5, 41 )
           , boundTo = ExtAudio
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 41 )
           , boundTo = MixCv
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808.4, 41 )
           , boundTo = VcaCv
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 80 )
           , boundTo = VcfCutoff
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808.4, 80 )
           , boundTo = VcfRes
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 119 )
           , boundTo = Vco1vOct
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 119 )
           , boundTo = VcoLinFm
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 157 )
           , boundTo = VcoMod
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 157 )
           , boundTo = LfoRate
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 196 )
           , boundTo = Mix1
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 196 )
           , boundTo = Mix2
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808.4, 196 )
           , boundTo = VcMixCtrl
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 235 )
           , boundTo = Mult
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 273.7 )
           , boundTo = GateIn
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 313 )
           , boundTo = Tempo
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 313 )
           , boundTo = RunStop
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808.4, 313 )
           , boundTo = Reset
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 313 )
           , boundTo = Hold
-          , geo = Nothing
           , isSelected = False
           }
         ]
     , outputs =
         [ { position = ( 847, 41 )
           , boundTo = Vca
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 729.5, 80 )
           , boundTo = Noise
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 80 )
           , boundTo = Vcf
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 807.7, 119 )
           , boundTo = VcoSaw
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 119 )
           , boundTo = VcoPulse
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 807.7, 157 )
           , boundTo = LfoTri
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 157 )
           , boundTo = LfoSq
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 196 )
           , boundTo = VcMixOut
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 235 )
           , boundTo = Mult1
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808, 235 )
           , boundTo = Mult2
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 235 )
           , boundTo = Assign
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 769, 273.7 )
           , boundTo = Eg
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 808, 273.7 )
           , boundTo = Kb
-          , geo = Nothing
           , isSelected = False
           }
         , { position = ( 847, 273.7 )
           , boundTo = GateOut
-          , geo = Nothing
           , isSelected = False
           }
         ]
@@ -321,7 +293,9 @@ mother32 =
 
 
 type alias Model =
-    Device
+    { device : Device
+    , selectedColor : String
+    }
 
 
 type alias Knob =
@@ -343,7 +317,6 @@ type alias Switch =
 type alias Jack =
     { boundTo : Parameter
     , position : ( Float, Float )
-    , geo : Maybe BoundingClientRect
     , isSelected : Bool
     }
 
@@ -442,8 +415,8 @@ type Msg
     | UserStopMovingKnob Parameter
     | UserChangePosition Parameter ( Float, Float )
     | GotKnobRect Parameter BoundingClientRect
-    | GotJackOutRect Parameter BoundingClientRect
-    | GotJackInRect Parameter BoundingClientRect
+    | UserClickJackOut Parameter
+    | UserClickJackIn Parameter
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -453,17 +426,22 @@ update msg model =
             let
                 knobs =
                     updateKnob
-                        model.knobs
+                        model.device.knobs
                         param
                         (\knob -> { knob | isMoving = True })
+
+                device =
+                    model.device
             in
-            ( { model | knobs = knobs }, Cmd.none )
+            ( { model | device = { device | knobs = knobs } }
+            , Cmd.none
+            )
 
         UserSetSwitch param ->
             let
                 switches =
                     updateSwitch
-                        model.switches
+                        model.device.switches
                         param
                         (\switch ->
                             case switch.direction of
@@ -473,11 +451,16 @@ update msg model =
                                 Down ->
                                     { switch | direction = Up }
                         )
+
+                device =
+                    model.device
             in
-            ( { model | switches = switches }, Cmd.none )
+            ( { model | device = { device | switches = switches } }
+            , Cmd.none
+            )
 
         UserChangePosition param pos ->
-            case getKnob param model.knobs of
+            case getKnob param model.device.knobs of
                 Just knob ->
                     let
                         f : Knob -> Knob
@@ -490,9 +473,14 @@ update msg model =
                                     knob_
 
                         knobs =
-                            updateKnob model.knobs knob.boundTo f
+                            updateKnob model.device.knobs knob.boundTo f
+
+                        device =
+                            model.device
                     in
-                    ( { model | knobs = knobs }, Cmd.none )
+                    ( { model | device = { device | knobs = knobs } }
+                    , Cmd.none
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -501,54 +489,72 @@ update msg model =
             let
                 knobs =
                     updateKnob
-                        model.knobs
+                        model.device.knobs
                         param
                         (\knob -> { knob | isMoving = False })
+
+                device =
+                    model.device
             in
-            ( { model | knobs = knobs }, Cmd.none )
+            ( { model | device = { device | knobs = knobs } }
+            , Cmd.none
+            )
 
         GotKnobRect param rect ->
             let
                 knobs =
                     updateKnob
-                        model.knobs
+                        model.device.knobs
                         param
                         (\knob_ -> { knob_ | geo = Just rect })
-            in
-            ( { model | knobs = knobs }, Cmd.none )
 
-        GotJackOutRect output rect ->
-            case findJack (\jack -> jack.isSelected) model.inputs of
+                device =
+                    model.device
+            in
+            ( { model | device = { device | knobs = knobs } }, Cmd.none )
+
+        UserClickJackOut output ->
+            case findJack (\jack -> jack.isSelected) model.device.inputs of
                 Just jack ->
                     let
+                        device =
+                            model.device
+
                         transform jack_ =
                             if jack_.boundTo == output then
-                                { jack_ | geo = Just rect }
+                                jack_
 
                             else
                                 { jack_ | isSelected = False }
 
                         outputs =
-                            List.map transform model.outputs
+                            List.map transform device.outputs
 
                         inputs =
                             List.map
                                 (\jack_ -> { jack_ | isSelected = False })
-                                model.inputs
+                                device.inputs
 
                         input =
                             jack.boundTo
 
                         patches =
-                            if List.member ( input, output ) model.patches then
+                            if List.member ( input, output ) device.patches then
                                 List.filter
                                     (\( inp, out ) -> not <| inp == input && out == output)
-                                    model.patches
+                                    device.patches
 
                             else
-                                ( input, output ) :: model.patches
+                                ( input, output ) :: device.patches
                     in
-                    ( { model | inputs = inputs, outputs = outputs, patches = patches }
+                    ( { model
+                        | device =
+                            { device
+                                | inputs = inputs
+                                , outputs = outputs
+                                , patches = patches
+                            }
+                      }
                     , Cmd.none
                     )
 
@@ -556,48 +562,63 @@ update msg model =
                     let
                         transform jack_ =
                             if jack_.boundTo == output then
-                                { jack_ | geo = Just rect, isSelected = True }
+                                { jack_ | isSelected = True }
 
                             else
                                 { jack_ | isSelected = False }
 
-                        outputs =
-                            List.map transform model.outputs
-                    in
-                    ( { model | outputs = outputs }, Cmd.none )
+                        device =
+                            model.device
 
-        GotJackInRect input rect ->
-            case findJack (\jack -> jack.isSelected) model.outputs of
+                        outputs =
+                            List.map transform device.outputs
+                    in
+                    ( { model | device = { device | outputs = outputs } }
+                    , Cmd.none
+                    )
+
+        UserClickJackIn input ->
+            case findJack (\jack -> jack.isSelected) model.device.outputs of
                 Just jack ->
                     let
+                        device =
+                            model.device
+
                         transform jack_ =
                             if jack_.boundTo == input then
-                                { jack_ | geo = Just rect }
+                                jack_
 
                             else
                                 { jack_ | isSelected = False }
 
                         inputs =
-                            List.map transform model.inputs
+                            List.map transform device.inputs
 
                         outputs =
                             List.map
                                 (\jack_ -> { jack_ | isSelected = False })
-                                model.outputs
+                                device.outputs
 
                         output =
                             jack.boundTo
 
                         patches =
-                            if List.member ( input, output ) model.patches then
+                            if List.member ( input, output ) device.patches then
                                 List.filter
                                     (\( inp, out ) -> not <| inp == input && out == output)
-                                    model.patches
+                                    device.patches
 
                             else
-                                ( input, output ) :: model.patches
+                                ( input, output ) :: device.patches
                     in
-                    ( { model | outputs = outputs, inputs = inputs, patches = patches }
+                    ( { model
+                        | device =
+                            { device
+                                | outputs = outputs
+                                , inputs = inputs
+                                , patches = patches
+                            }
+                      }
                     , Cmd.none
                     )
 
@@ -605,15 +626,18 @@ update msg model =
                     let
                         transform jack_ =
                             if jack_.boundTo == input then
-                                { jack_ | geo = Just rect, isSelected = True }
+                                { jack_ | isSelected = True }
 
                             else
                                 { jack_ | isSelected = False }
 
+                        device =
+                            model.device
+
                         inputs =
-                            List.map transform model.inputs
+                            List.map transform device.inputs
                     in
-                    ( { model | inputs = inputs }, Cmd.none )
+                    ( { model | device = { device | inputs = inputs } }, Cmd.none )
 
 
 
@@ -623,6 +647,7 @@ update msg model =
 view : Model -> Html.Html Msg
 view model =
     let
+        device = model.device
         devicePicture =
             [ Svg.image
                 [ SvgA.xlinkHref "Mother-32.png"
@@ -641,21 +666,21 @@ view model =
             ]
 
         knobsSvg =
-            List.map knobView model.knobs
+            List.map knobView device.knobs
 
         switchesSvg =
-            List.map switchView model.switches
+            List.map switchView device.switches
 
         jackInSvg =
-            List.map (jackView GotJackInRect) model.inputs
+            List.map (jackView UserClickJackIn) device.inputs
 
         jackOutSvg =
-            List.map (jackView GotJackOutRect) model.outputs
+            List.map (jackView UserClickJackOut) device.outputs
 
         patchSvg =
             List.filterMap
-                (Maybe.map patchView << patchToJack model.inputs model.outputs)
-                model.patches
+                (Maybe.map patchView << patchToJack device.inputs device.outputs)
+                device.patches
     in
     Html.div []
         [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
@@ -680,7 +705,7 @@ debugView model =
         , HtmlA.style "padding" "0.5em"
         ]
     <|
-        case findKnob (\knob -> knob.isMoving) model.knobs of
+        case findKnob (\knob -> knob.isMoving) model.device.knobs of
             Just knob ->
                 let
                     ( cx, cy ) =
@@ -739,7 +764,7 @@ patchView ( jackIn, jackOut ) =
         []
 
 
-jackView : (Parameter -> BoundingClientRect -> Msg) -> Jack -> Svg.Svg Msg
+jackView : (Parameter -> Msg) -> Jack -> Svg.Svg Msg
 jackView msg jack =
     let
         ( cx, cy ) =
@@ -773,7 +798,7 @@ jackView msg jack =
             ]
     in
     Svg.g
-        [ SvgE.on "mousedown" (getBoundingClientRect (msg jack.boundTo))
+        [ SvgE.onClick (msg jack.boundTo)
         ]
         (if jack.isSelected then
             base ++ whenSelected
