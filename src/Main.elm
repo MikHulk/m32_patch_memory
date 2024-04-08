@@ -18,6 +18,7 @@ main =
             \_ ->
                 ( { device = mother32
                   , selectedColor = "red"
+                  , curve = 1.7
                   }
                 , Cmd.none
                 )
@@ -301,6 +302,7 @@ mother32 =
 type alias Model =
     { device : Device
     , selectedColor : String
+    , curve: Float
     }
 
 
@@ -688,7 +690,7 @@ view model =
 
         patchSvg =
             List.filterMap
-                (Maybe.map patchView << patchToJack device.inputs device.outputs)
+                (Maybe.map (patchView model.curve) << patchToJack device.inputs device.outputs)
             <|
                 Al.toList device.patches
     in
@@ -707,47 +709,44 @@ view model =
         ]
 
 
-patchView : ( Jack, Jack, String ) -> Svg.Svg Msg
-patchView ( jackIn, jackOut, color ) =
+patchView : Float -> ( Jack, Jack, String ) -> Svg.Svg Msg
+patchView curve ( jackIn, jackOut, color ) =
     let
         ( inX, inY ) =
             jackIn.position
 
         ( outX, outY ) =
             jackOut.position
-
-        ( dist, ang ) =
-            toPolar
-                ( outX - inX
-                , outY - inY
-                )
-
-        curve =
-            9.0
-
-        ( ctrlX, ctrlY ) =
-            fromPolar
-                ( dist / (2 * cos (pi / curve))
-                , ang - pi / curve
-                )
     in
-    quadraCurve
+    quadraCurve curve
         [ SvgA.strokeWidth "4"
         , SvgA.stroke color
         , SvgA.fill "none"
         ]
         ( inX, inY )
-        ( inX + ctrlX, inY + ctrlY )
         ( outX, outY )
 
 
 quadraCurve :
-    List (Svg.Attribute Msg)
-    -> ( Float, Float )
+    Float
+    -> List (Svg.Attribute Msg)
     -> ( Float, Float )
     -> ( Float, Float )
     -> Svg.Svg Msg
-quadraCurve attrs ( origX, origY ) ( ctrlX, ctrlY ) ( destX, destY ) =
+quadraCurve curve attrs ( origX, origY ) ( destX, destY ) =
+    let
+        ( dist, ang ) =
+            toPolar
+                ( destX - origX
+                , destY - origY
+                )
+
+        ( ctrlX, ctrlY ) =
+            fromPolar
+                ( dist / (2 * cos (pi / (16.0 / curve)))
+                , ang - (pi / (16.0 / curve))
+                )
+    in
     Svg.path
         ([ SvgA.d <|
             "M "
@@ -755,9 +754,9 @@ quadraCurve attrs ( origX, origY ) ( ctrlX, ctrlY ) ( destX, destY ) =
                 ++ " "
                 ++ String.fromFloat (origY + 12.5)
                 ++ " Q "
-                ++ String.fromFloat (ctrlX + 12.5)
+                ++ String.fromFloat (origX + ctrlX + 12.5)
                 ++ " "
-                ++ String.fromFloat (ctrlY + 12.5)
+                ++ String.fromFloat (origY + ctrlY + 12.5)
                 ++ " "
                 ++ String.fromFloat (destX + 12.5)
                 ++ " "
