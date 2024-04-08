@@ -722,10 +722,13 @@ patchView ( jackIn, jackOut, color ) =
                 , outY - inY
                 )
 
+        curve =
+            9.0
+
         ( ctrlX, ctrlY ) =
             fromPolar
-                ( dist * 0.5
-                , ang + pi / 6.0
+                ( dist / (2 * cos (pi / curve))
+                , ang - pi / curve
                 )
     in
     Svg.path
