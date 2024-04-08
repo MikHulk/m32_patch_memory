@@ -731,24 +731,40 @@ patchView ( jackIn, jackOut, color ) =
                 , ang - pi / curve
                 )
     in
-    Svg.path
-        [ SvgA.d <|
-            "M "
-                ++ String.fromFloat (inX + 12.5)
-                ++ " "
-                ++ String.fromFloat (inY + 12.5)
-                ++ " Q "
-                ++ String.fromFloat (inX + ctrlX + 12.5)
-                ++ " "
-                ++ String.fromFloat (inY + ctrlY + 12.5)
-                ++ " "
-                ++ String.fromFloat (outX + 12.5)
-                ++ " "
-                ++ String.fromFloat (outY + 12.5)
-        , SvgA.strokeWidth "4"
+    quadraCurve
+        [ SvgA.strokeWidth "4"
         , SvgA.stroke color
         , SvgA.fill "none"
         ]
+        ( inX, inY )
+        ( inX + ctrlX, inY + ctrlY )
+        ( outX, outY )
+
+
+quadraCurve :
+    List (Svg.Attribute Msg)
+    -> ( Float, Float )
+    -> ( Float, Float )
+    -> ( Float, Float )
+    -> Svg.Svg Msg
+quadraCurve attrs ( origX, origY ) ( ctrlX, ctrlY ) ( destX, destY ) =
+    Svg.path
+        ([ SvgA.d <|
+            "M "
+                ++ String.fromFloat (origX + 12.5)
+                ++ " "
+                ++ String.fromFloat (origY + 12.5)
+                ++ " Q "
+                ++ String.fromFloat (ctrlX + 12.5)
+                ++ " "
+                ++ String.fromFloat (ctrlY + 12.5)
+                ++ " "
+                ++ String.fromFloat (destX + 12.5)
+                ++ " "
+                ++ String.fromFloat (destY + 12.5)
+         ]
+            ++ attrs
+        )
         []
 
 
