@@ -704,54 +704,7 @@ view model =
                 ++ patchSvg
                 ++ jackInSvg
                 ++ jackOutSvg
-        , Html.p [] [ debugView model ]
         ]
-
-
-debugView : Model -> Html.Html Msg
-debugView model =
-    Html.div
-        [ HtmlA.style "background-color" "#FFEEEE"
-        , HtmlA.style "padding" "0.5em"
-        ]
-    <|
-        case findKnob (\knob -> knob.isMoving) model.device.knobs of
-            Just knob ->
-                let
-                    ( cx, cy ) =
-                        knob.position
-
-                    knobAngle =
-                        (valueToAngle >> fromClockWise >> rotate 2.03) knob.value
-
-                    ( x1, y1 ) =
-                        fromPolar ( 36.0, knobAngle )
-
-                    ( x2, y2 ) =
-                        fromPolar ( 16.0, knobAngle )
-                in
-                [ Html.p []
-                    [ Html.text <|
-                        Debug.toString knob.boundTo
-                            ++ ": "
-                            ++ String.fromFloat knob.value
-                    ]
-                , Html.p []
-                    [ Html.text <|
-                        Debug.toString
-                            ( (toFloat <| round (x1 * 10000.0)) / 10000.0
-                            , (toFloat <| round (y1 * 10000.0)) / 10000.0
-                            )
-                            ++ ": "
-                            ++ Debug.toString
-                                ( (toFloat <| round (x2 * 10000.0)) / 10000.0
-                                , (toFloat <| round (y2 * 10000.0)) / 10000.0
-                                )
-                    ]
-                ]
-
-            _ ->
-                [ Html.text "Knob not mooving" ]
 
 
 patchView : ( Jack, Jack, String ) -> Svg.Svg Msg
