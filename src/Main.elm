@@ -302,7 +302,7 @@ mother32 =
 type alias Model =
     { device : Device
     , selectedColor : String
-    , curve: Float
+    , curve : Float
     }
 
 
@@ -417,34 +417,26 @@ type Parameter
 -- Update
 
 
+type KnobMsg
+    = Move
+    | StopMoving
+    | ChangePosition ( Float, Float )
+
+
 type Msg
-    = UserMoveKnob Parameter
+    = UserSetKnob Parameter KnobMsg
     | UserSetSwitch Parameter
-    | UserStopMovingKnob Parameter
-    | UserChangePosition Parameter ( Float, Float )
-    | GotKnobRect Parameter BoundingClientRect
     | UserClickJackOut Parameter
     | UserClickJackIn Parameter
     | UserSelectColor String
+    | GotKnobRect Parameter BoundingClientRect
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        UserMoveKnob param ->
-            let
-                knobs =
-                    updateKnob
-                        model.device.knobs
-                        param
-                        (\knob -> { knob | isMoving = True })
-
-                device =
-                    model.device
-            in
-            ( { model | device = { device | knobs = knobs } }
-            , Cmd.none
-            )
+        UserSetKnob param knobMsg ->
+            knobUpdate param knobMsg model
 
         UserSetSwitch param ->
             let
@@ -467,60 +459,6 @@ update msg model =
             ( { model | device = { device | switches = switches } }
             , Cmd.none
             )
-
-        UserChangePosition param pos ->
-            case getKnob param model.device.knobs of
-                Just knob ->
-                    let
-                        f : Knob -> Knob
-                        f knob_ =
-                            case posToValue knob_ pos of
-                                Just value ->
-                                    { knob_ | value = value }
-
-                                _ ->
-                                    knob_
-
-                        knobs =
-                            updateKnob model.device.knobs knob.boundTo f
-
-                        device =
-                            model.device
-                    in
-                    ( { model | device = { device | knobs = knobs } }
-                    , Cmd.none
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        UserStopMovingKnob param ->
-            let
-                knobs =
-                    updateKnob
-                        model.device.knobs
-                        param
-                        (\knob -> { knob | isMoving = False })
-
-                device =
-                    model.device
-            in
-            ( { model | device = { device | knobs = knobs } }
-            , Cmd.none
-            )
-
-        GotKnobRect param rect ->
-            let
-                knobs =
-                    updateKnob
-                        model.device.knobs
-                        param
-                        (\knob_ -> { knob_ | geo = Just rect })
-
-                device =
-                    model.device
-            in
-            ( { model | device = { device | knobs = knobs } }, Cmd.none )
 
         UserClickJackOut output ->
             case findJack (\jack -> jack.isSelected) model.device.inputs of
@@ -646,6 +584,79 @@ update msg model =
 
         UserSelectColor color ->
             ( { model | selectedColor = color }, Cmd.none )
+
+        GotKnobRect param rect ->
+            let
+                knobs =
+                    updateKnob
+                        model.device.knobs
+                        param
+                        (\knob_ -> { knob_ | geo = Just rect })
+
+                device =
+                    model.device
+            in
+            ( { model | device = { device | knobs = knobs } }, Cmd.none )
+
+
+knobUpdate : Parameter -> KnobMsg -> Model -> ( Model, Cmd Msg )
+knobUpdate param msg model =
+    case msg of
+        Move ->
+            let
+                knobs =
+                    updateKnob
+                        model.device.knobs
+                        param
+                        (\knob -> { knob | isMoving = True })
+
+                device =
+                    model.device
+            in
+            ( { model | device = { device | knobs = knobs } }
+            , Cmd.none
+            )
+
+        ChangePosition pos ->
+            case getKnob param model.device.knobs of
+                Just knob ->
+                    let
+                        f : Knob -> Knob
+                        f knob_ =
+                            case posToValue knob_ pos of
+                                Just value ->
+                                    { knob_ | value = value }
+
+                                _ ->
+                                    knob_
+
+                        knobs =
+                            updateKnob model.device.knobs knob.boundTo f
+
+                        device =
+                            model.device
+                    in
+                    ( { model | device = { device | knobs = knobs } }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        StopMoving ->
+            let
+                knobs =
+                    updateKnob
+                        model.device.knobs
+                        param
+                        (\knob -> { knob | isMoving = False })
+
+                device =
+                    model.device
+            in
+            ( { model | device = { device | knobs = knobs } }
+            , Cmd.none
+            )
 
 
 
@@ -929,7 +940,7 @@ knobView knob =
                 , SvgA.cy <| String.fromFloat cy
                 , SvgA.r "34"
                 , SvgA.opacity "0.0"
-                , SvgE.onMouseDown <| UserMoveKnob knob.boundTo
+                , SvgE.onMouseDown <| UserSetKnob knob.boundTo Move
                 ]
                 []
             ]
@@ -953,9 +964,9 @@ knobView knob =
                             , SvgA.cy <| String.fromFloat cy
                             , SvgA.r "35"
                             , SvgA.opacity "0.0"
-                            , SvgE.onMouseUp (UserStopMovingKnob knob.boundTo)
-                            , SvgE.onMouseOut (UserStopMovingKnob knob.boundTo)
-                            , onMove (UserChangePosition knob.boundTo)
+                            , SvgE.onMouseUp (UserSetKnob knob.boundTo StopMoving)
+                            , SvgE.onMouseOut (UserSetKnob knob.boundTo StopMoving)
+                            , onMove (UserSetKnob knob.boundTo << ChangePosition)
                             ]
                             []
                        ]
