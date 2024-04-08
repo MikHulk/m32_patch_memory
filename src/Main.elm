@@ -671,7 +671,7 @@ view model =
                 , SvgA.y "0"
                 ]
                 []
-            , colorSelectorView
+            , colorSelectorView model.selectedColor
             ]
 
         knobsSvg =
@@ -762,33 +762,79 @@ patchView ( jackIn, jackOut, color ) =
 
         ( outX, outY ) =
             jackOut.position
+
+        ( dist, ang ) =
+            toPolar
+                ( outX - inX
+                , outY - inY
+                )
+
+        ( ctrlX, ctrlY ) =
+            fromPolar
+                ( dist * 0.5
+                , ang + pi / 6.0
+                )
     in
-    Svg.line
-        [ SvgA.x1 <| String.fromFloat (inX + 12.5)
-        , SvgA.y1 <| String.fromFloat (inY + 12.5)
-        , SvgA.x2 <| String.fromFloat (outX + 12.5)
-        , SvgA.y2 <| String.fromFloat (outY + 12.5)
-        , SvgA.strokeWidth "3"
+    Svg.path
+        [ SvgA.d <|
+            "M "
+                ++ String.fromFloat (inX + 12.5)
+                ++ " "
+                ++ String.fromFloat (inY + 12.5)
+                ++ " Q "
+                ++ String.fromFloat (inX + ctrlX + 12.5)
+                ++ " "
+                ++ String.fromFloat (inY + ctrlY + 12.5)
+                ++ " "
+                ++ String.fromFloat (outX + 12.5)
+                ++ " "
+                ++ String.fromFloat (outY + 12.5)
+        , SvgA.strokeWidth "4"
         , SvgA.stroke color
+        , SvgA.fill "none"
         ]
         []
 
 
-colorSelectorView : Svg.Svg Msg
-colorSelectorView =
+colorSelectorView : String -> Svg.Svg Msg
+colorSelectorView selected =
     let
         square id color =
-            Svg.rect
-                [ SvgA.width "7"
-                , SvgA.height "7"
-                , SvgA.stroke "black"
-                , SvgA.fill color
-                , SvgA.strokeWidth "1"
-                , SvgA.x <| String.fromFloat (750.0 + toFloat id * 10.0)
-                , SvgA.y "350.0"
-                , SvgE.onClick <| UserSelectColor color
-                ]
-                []
+            let
+                base =
+                    Svg.rect
+                        [ SvgA.width "7"
+                        , SvgA.height "7"
+                        , SvgA.stroke "black"
+                        , SvgA.fill color
+                        , SvgA.strokeWidth "1"
+                        , SvgA.x <| String.fromFloat (750.0 + toFloat id * 10.0)
+                        , SvgA.y "350.0"
+                        , SvgE.onClick <| UserSelectColor color
+                        ]
+                        []
+
+                selectedBox =
+                    Svg.rect
+                        [ SvgA.width "10"
+                        , SvgA.height "10"
+                        , SvgA.stroke "red"
+                        , SvgA.fill color
+                        , SvgA.strokeWidth "1"
+                        , SvgA.x <| String.fromFloat (750.0 + toFloat id * 10.0 - 1.5)
+                        , SvgA.y "348.5"
+                        , SvgE.onClick <| UserSelectColor color
+                        ]
+                        []
+            in
+            Svg.g
+                [ SvgE.onClick <| UserSelectColor color ]
+            <|
+                if selected == color then
+                    [ selectedBox, base ]
+
+                else
+                    [ base ]
     in
     Svg.g [] <| List.indexedMap square colors
 
