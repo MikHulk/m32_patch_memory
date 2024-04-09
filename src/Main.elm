@@ -728,14 +728,34 @@ patchView curve ( jackIn, jackOut, color ) =
 
         ( outX, outY ) =
             jackOut.position
+
+        r = 2.0
     in
-    quadraCurve curve
-        [ SvgA.strokeWidth "4"
-        , SvgA.stroke color
-        , SvgA.fill "none"
+    Svg.g []
+        [ quadraCurve curve
+            [ SvgA.strokeWidth "4"
+            , SvgA.stroke color
+            , SvgA.fill "none"
+            ]
+            ( inX, inY )
+            ( outX, outY )
+        , Svg.circle
+            [ SvgA.cx <| String.fromFloat (inX + 12.5) 
+            , SvgA.cy <| String.fromFloat (inY + 12.7)
+            , SvgA.r <| String.fromFloat r
+            , SvgA.opacity "1.0"
+            , SvgA.fill color
+            ]
+            []
+        , Svg.circle
+            [ SvgA.cx <| String.fromFloat (outX + 12.5) 
+            , SvgA.cy <| String.fromFloat (outY + 12.7)
+            , SvgA.r <| String.fromFloat r
+            , SvgA.opacity "1.0"
+            , SvgA.fill color
+            ]
+            []
         ]
-        ( inX, inY )
-        ( outX, outY )
 
 
 quadraCurve :
