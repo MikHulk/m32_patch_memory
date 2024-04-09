@@ -18,7 +18,7 @@ main =
             \_ ->
                 ( { device = mother32
                   , selectedColor = "red"
-                  , curve = 1.7
+                  , patchesCurve = 1.7
                   }
                 , Cmd.none
                 )
@@ -302,7 +302,7 @@ mother32 =
 type alias Model =
     { device : Device
     , selectedColor : String
-    , curve : Float
+    , patchesCurve : Float
     }
 
 
@@ -429,6 +429,7 @@ type Msg
     | UserClickJackOut Parameter
     | UserClickJackIn Parameter
     | UserSelectColor String
+    | UserChangeCurve (Maybe Float)
     | GotKnobRect Parameter BoundingClientRect
 
 
@@ -598,6 +599,14 @@ update msg model =
             in
             ( { model | device = { device | knobs = knobs } }, Cmd.none )
 
+        UserChangeCurve curveOpt ->
+            case curveOpt of
+                Just curve ->
+                    ( { model | patchesCurve = curve }, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
 
 knobUpdate : Parameter -> KnobMsg -> Model -> ( Model, Cmd Msg )
 knobUpdate param msg model =
@@ -701,22 +710,58 @@ view model =
 
         patchSvg =
             List.filterMap
-                (Maybe.map (patchView model.curve) << patchToJack device.inputs device.outputs)
+                (Maybe.map (patchView model.patchesCurve)
+                    << patchToJack device.inputs device.outputs
+                )
             <|
                 Al.toList device.patches
     in
     Html.div []
         [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
-        , Svg.svg
-            [ SvgA.viewBox "0 0 900 380"
+        , Html.div
+            [ HtmlA.id "device" ]
+            [ Svg.svg
+                [ SvgA.viewBox "0 0 900 380"
+                ]
+              <|
+                devicePicture
+                    ++ knobsSvg
+                    ++ switchesSvg
+                    ++ patchSvg
+                    ++ jackInSvg
+                    ++ jackOutSvg
             ]
-          <|
-            devicePicture
-                ++ knobsSvg
-                ++ switchesSvg
-                ++ patchSvg
-                ++ jackInSvg
-                ++ jackOutSvg
+        , controlView model
+        ]
+
+
+controlView : Model -> Html.Html Msg
+controlView model =
+    let
+        curve =
+            model.patchesCurve
+                * 1000
+                |> round
+                |> toFloat
+                |> flip (/) 1000.0
+                |> String.fromFloat
+    in
+    Html.div
+        [ HtmlA.id "controls"
+        ]
+        [ Html.h1 [] [ Html.text "Controls" ]
+        , Html.label
+            []
+            [ Html.text <| "curvature(" ++ curve ++ ")" ]
+        , Html.input
+            [ HtmlA.type_ "range"
+            , HtmlA.step "any"
+            , HtmlA.value <| String.fromFloat model.patchesCurve
+            , HtmlA.min "-5"
+            , HtmlA.max "5"
+            , HtmlE.onInput (String.toFloat >> UserChangeCurve)
+            ]
+            []
         ]
 
 
@@ -729,7 +774,8 @@ patchView curve ( jackIn, jackOut, color ) =
         ( outX, outY ) =
             jackOut.position
 
-        r = 2.0
+        r =
+            2.0
     in
     Svg.g []
         [ quadraCurve curve
@@ -740,7 +786,7 @@ patchView curve ( jackIn, jackOut, color ) =
             ( inX, inY )
             ( outX, outY )
         , Svg.circle
-            [ SvgA.cx <| String.fromFloat (inX + 12.5) 
+            [ SvgA.cx <| String.fromFloat (inX + 12.5)
             , SvgA.cy <| String.fromFloat (inY + 12.7)
             , SvgA.r <| String.fromFloat r
             , SvgA.opacity "1.0"
@@ -748,7 +794,7 @@ patchView curve ( jackIn, jackOut, color ) =
             ]
             []
         , Svg.circle
-            [ SvgA.cx <| String.fromFloat (outX + 12.5) 
+            [ SvgA.cx <| String.fromFloat (outX + 12.5)
             , SvgA.cy <| String.fromFloat (outY + 12.7)
             , SvgA.r <| String.fromFloat r
             , SvgA.opacity "1.0"
@@ -1044,6 +1090,11 @@ positionDecoder msg =
 
 
 -- Utils
+
+
+flip : (a -> b -> c) -> b -> a -> c
+flip f x y =
+    f y x
 
 
 getKnob : Parameter -> List Knob -> Maybe Knob

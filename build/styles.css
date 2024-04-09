@@ -15,3 +15,27 @@ body {
 html {
     background-color: #99989f;
 }
+
+#device {   
+    box-shadow: #353232 5px 5px 6px;
+}
+
+#controls {
+    display: grid;
+    grid-template-columns: 150px 150px;
+    margin: 0px auto;
+    margin-top: 1em;
+    width: 300px;
+    color: #273444;
+    background-color: #c2c0c8;
+    box-shadow: #353232 2px 4px 6px;
+    padding: 0.5em;
+}
+
+#controls h1 {
+    margin: 0.1em;
+    font-size: 1.2em;
+    grid-column-start: 1;
+    grid-column-end: 3;
+    text-align: center;
+}
