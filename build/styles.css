@@ -39,3 +39,10 @@ html {
     grid-column-end: 3;
     text-align: center;
 }
+
+#controls button {
+    width: 10em;
+    margin: auto;
+    text-align: center;
+    margin-top: 0.3em;
+}

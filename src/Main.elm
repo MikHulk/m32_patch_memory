@@ -762,6 +762,18 @@ controlView model =
             , HtmlE.onInput (String.toFloat >> UserChangeCurve)
             ]
             []
+        , Html.button
+            []
+            [Html.text "Load"]
+        , Html.button
+            []
+            [Html.text "Save"]
+        , Html.button
+            []
+            [Html.text "To text"]
+        , Html.button
+            []
+            [Html.text "To svg"]
         ]
 
 
