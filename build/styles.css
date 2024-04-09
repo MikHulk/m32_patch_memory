@@ -46,3 +46,20 @@ html {
     text-align: center;
     margin-top: 0.3em;
 }
+
+#notes {
+    margin: 0px auto;
+    margin-top: 1em;
+    height: 1.4em;
+    width: 80%;
+    color: #273444;
+    background-color: #f4f0e0;
+    box-shadow: #353232 2px 4px 6px;
+    padding: 0.5em;
+}
+
+#notes .note-row {
+    display: grid;
+    grid-template-columns: auto 2em;
+}
+    

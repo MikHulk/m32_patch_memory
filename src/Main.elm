@@ -732,6 +732,21 @@ view model =
                     ++ jackOutSvg
             ]
         , controlView model
+        , noteView model
+        ]
+
+
+noteView : Model -> Html.Html Msg
+noteView model =
+    Html.div
+        [ HtmlA.id "notes"
+        ]
+        [ Html.div
+            [ HtmlA.class "note-row"
+            ]
+            [ Html.text "No note for now click on right to add one."
+            , addButton []
+            ]
         ]
 
 
@@ -764,16 +779,16 @@ controlView model =
             []
         , Html.button
             []
-            [Html.text "Load"]
+            [ Html.text "Load" ]
         , Html.button
             []
-            [Html.text "Save"]
+            [ Html.text "Save" ]
         , Html.button
             []
-            [Html.text "To text"]
+            [ Html.text "To text" ]
         , Html.button
             []
-            [Html.text "To svg"]
+            [ Html.text "To svg" ]
         ]
 
 
@@ -1058,6 +1073,47 @@ knobView knob =
             (getBoundingClientRect (GotKnobRect knob.boundTo))
         ]
         children
+
+
+
+-- Svg Widgets
+
+
+addButton : List (Html.Attribute Msg) -> Html.Html Msg
+addButton attrs =
+    Svg.svg
+        ([ SvgA.height "20", SvgA.width "25" ] ++ attrs)
+        [ Svg.circle
+            [ SvgA.cx "12"
+            , SvgA.cy "10"
+            , SvgA.r "9"
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "0.5"
+            , SvgA.fill "dodgerblue"
+            ]
+            []
+        , Svg.line
+            [ SvgA.x1 "7"
+            , SvgA.y1 "10"
+            , SvgA.x2 "17"
+            , SvgA.y2 "10"
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "white"
+            , SvgA.strokeWidth "3"
+            ]
+            []
+        , Svg.line
+            [ SvgA.x1 "12"
+            , SvgA.y1 "5"
+            , SvgA.x2 "12"
+            , SvgA.y2 "15"
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "white"
+            , SvgA.strokeWidth "3"
+            ]
+            []
+        ]
 
 
 
