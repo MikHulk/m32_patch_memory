@@ -19,6 +19,10 @@ main =
                 ( { device = mother32
                   , selectedColor = "red"
                   , patchesCurve = 1.7
+                  , notes =
+                        { newNote = ""
+                        , notes = []
+                        }
                   }
                 , Cmd.none
                 )
@@ -303,6 +307,13 @@ type alias Model =
     { device : Device
     , selectedColor : String
     , patchesCurve : Float
+    , notes : NotesModel
+    }
+
+
+type alias NotesModel =
+    { newNote : String
+    , notes : List String
     }
 
 
@@ -423,6 +434,12 @@ type KnobMsg
     | ChangePosition ( Float, Float )
 
 
+type NoteMsg
+    = UserSubmitNewNote
+    | UserUpdateNewNote String
+    | UserRemoveNote Int
+
+
 type Msg
     = UserSetKnob Parameter KnobMsg
     | UserSetSwitch Parameter
@@ -430,6 +447,7 @@ type Msg
     | UserClickJackIn Parameter
     | UserSelectColor String
     | UserChangeCurve (Maybe Float)
+    | UserNote NoteMsg
     | GotKnobRect Parameter BoundingClientRect
 
 
@@ -607,6 +625,34 @@ update msg model =
                 Nothing ->
                     ( model, Cmd.none )
 
+        UserNote noteMsg ->
+            let
+                ( notesModel, cmd ) =
+                    noteUpdate noteMsg model.notes
+            in
+            ( { model | notes = notesModel }, cmd )
+
+
+noteUpdate : NoteMsg -> NotesModel -> ( NotesModel, Cmd Msg )
+noteUpdate msg model =
+    case msg of
+        UserRemoveNote id ->
+            let
+                notes =
+                    List.take id model.notes ++ List.drop (id + 1) model.notes
+            in
+            ( { model | notes = notes }, Cmd.none )
+
+        UserUpdateNewNote note ->
+            ( { model | newNote = note }, Cmd.none )
+
+        UserSubmitNewNote ->
+            let
+                notes =
+                    model.newNote :: model.notes
+            in
+            ( { model | newNote = "", notes = notes }, Cmd.none )
+
 
 knobUpdate : Parameter -> KnobMsg -> Model -> ( Model, Cmd Msg )
 knobUpdate param msg model =
@@ -709,11 +755,12 @@ view model =
             List.map (jackView UserClickJackOut) device.outputs
 
         patchSvg =
-            List.filterMap
-                (Maybe.map (patchView model.patchesCurve)
-                    << patchToJack device.inputs device.outputs
-                )
-            <|
+            let
+                f =
+                    Maybe.map (patchView model.patchesCurve)
+                        << patchToJack device.inputs device.outputs
+            in
+            List.filterMap f <|
                 Al.toList device.patches
     in
     Html.div []
@@ -732,22 +779,44 @@ view model =
                     ++ jackOutSvg
             ]
         , controlView model
-        , noteView model
+        , noteListView model.notes
         ]
 
 
-noteView : Model -> Html.Html Msg
-noteView model =
+noteView : Int -> String -> Html.Html Msg
+noteView id note =
+    Html.div
+        [ HtmlA.class "note-row"
+        ]
+        [ Html.div [ HtmlA.class "note" ] [ Html.text note ]
+        , removeButton [ HtmlE.onClick <| UserNote <| UserRemoveNote id ]
+        ]
+
+
+noteListView : NotesModel -> Html.Html Msg
+noteListView model =
+    let
+        notes =
+            List.indexedMap noteView model.notes
+    in
     Html.div
         [ HtmlA.id "notes"
         ]
+    <|
         [ Html.div
             [ HtmlA.class "note-row"
             ]
-            [ Html.text "No note for now click on right to add one."
-            , addButton []
+          <|
+            [ Html.input
+                [ HtmlE.onInput <| UserNote << UserUpdateNewNote
+                , HtmlA.placeholder "Enter a new note here"
+                , HtmlA.value model.newNote
+                ]
+                []
+            , addButton [ HtmlE.onClick <| UserNote <| UserSubmitNewNote ]
             ]
         ]
+            ++ notes
 
 
 controlView : Model -> Html.Html Msg
@@ -898,7 +967,7 @@ colorSelectorView selected =
                         , SvgA.strokeWidth "1"
                         , SvgA.x <| String.fromFloat (750.0 + toFloat id * 10.0 - 1.5)
                         , SvgA.y "348.5"
-                        , SvgE.onClick <| UserSelectColor color
+                        , SvgE.onMouseDown <| UserSelectColor color
                         ]
                         []
             in
@@ -950,12 +1019,12 @@ jackView msg jack =
     Svg.g
         [ SvgE.onClick (msg jack.boundTo)
         ]
-        (if jack.isSelected then
+    <|
+        if jack.isSelected then
             base ++ whenSelected
 
-         else
+        else
             base
-        )
 
 
 switchView : Switch -> Svg.Svg Msg
@@ -1081,12 +1150,29 @@ knobView knob =
 
 addButton : List (Html.Attribute Msg) -> Html.Html Msg
 addButton attrs =
+    let
+        m =
+            2.5
+        
+        r =
+            9.0
+
+        r_ =
+            5.0
+
+        c =
+            r + m
+    in
     Svg.svg
-        ([ SvgA.height "20", SvgA.width "25" ] ++ attrs)
+        ([ SvgA.height <| String.fromFloat <| r * 2.0 + m * 2.0
+         , SvgA.width <| String.fromFloat <| r * 2.0 + m * 2.0
+         ]
+            ++ attrs
+        )
         [ Svg.circle
-            [ SvgA.cx "12"
-            , SvgA.cy "10"
-            , SvgA.r "9"
+            [ SvgA.cx <| String.fromFloat <| c
+            , SvgA.cy <| String.fromFloat <| c
+            , SvgA.r <| String.fromFloat <| r
             , SvgA.opacity "1.0"
             , SvgA.stroke "black"
             , SvgA.strokeWidth "0.5"
@@ -1094,22 +1180,76 @@ addButton attrs =
             ]
             []
         , Svg.line
-            [ SvgA.x1 "7"
-            , SvgA.y1 "10"
-            , SvgA.x2 "17"
-            , SvgA.y2 "10"
+            [ SvgA.x1 <| String.fromFloat <| c - r_
+            , SvgA.y1 <| String.fromFloat <| c
+            , SvgA.x2 <| String.fromFloat <| c + r_
+            , SvgA.y2 <| String.fromFloat <| c
             , SvgA.opacity "1.0"
             , SvgA.stroke "white"
             , SvgA.strokeWidth "3"
             ]
             []
         , Svg.line
-            [ SvgA.x1 "12"
-            , SvgA.y1 "5"
-            , SvgA.x2 "12"
-            , SvgA.y2 "15"
+            [ SvgA.x1 <| String.fromFloat <| c
+            , SvgA.y1 <| String.fromFloat <| c - r_
+            , SvgA.x2 <| String.fromFloat <| c
+            , SvgA.y2 <| String.fromFloat <| c + r_
             , SvgA.opacity "1.0"
             , SvgA.stroke "white"
+            , SvgA.strokeWidth "3"
+            ]
+            []
+        ]
+
+
+removeButton : List (Html.Attribute Msg) -> Html.Html Msg
+removeButton attrs =
+    let
+        m =
+            2.5
+
+        r =
+            9.0
+
+        r_ =
+            5.0
+
+        c =
+            r + m
+    in
+    Svg.svg
+        ([ SvgA.height <| String.fromFloat <| r * 2.0 + m * 2.0
+         , SvgA.width <| String.fromFloat <| r * 2.0 + m * 2.0
+         ]
+            ++ attrs
+        )
+        [ Svg.circle
+            [ SvgA.cx <| String.fromFloat <| c
+            , SvgA.cy <| String.fromFloat <| c
+            , SvgA.r <| String.fromFloat <| r
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "0.5"
+            , SvgA.fill "palevioletred"
+            ]
+            []
+        , Svg.line
+            [ SvgA.x1 <| String.fromFloat <| c + r_ * cos (pi / 4.0)
+            , SvgA.y1 <| String.fromFloat <| c + r_ * -(sin (pi / 4.0))
+            , SvgA.x2 <| String.fromFloat <| c + r_ * -(cos (pi / 4.0))
+            , SvgA.y2 <| String.fromFloat <| c + r_ * sin (pi / 4.0)
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "black"
+            , SvgA.strokeWidth "3"
+            ]
+            []
+        , Svg.line
+            [ SvgA.x1 <| String.fromFloat <| c + r_ * -(cos (pi / 4.0))
+            , SvgA.y1 <| String.fromFloat <| c + r_ * -(sin (pi / 4.0))
+            , SvgA.x2 <| String.fromFloat <| c + r_ * cos (pi / 4.0)
+            , SvgA.y2 <| String.fromFloat <| c + r_ * sin (pi / 4.0)
+            , SvgA.opacity "1.0"
+            , SvgA.stroke "black"
             , SvgA.strokeWidth "3"
             ]
             []

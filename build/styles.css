@@ -16,7 +16,7 @@ html {
     background-color: #99989f;
 }
 
-#device {   
+#device {
     box-shadow: #353232 5px 5px 6px;
 }
 
@@ -50,16 +50,28 @@ html {
 #notes {
     margin: 0px auto;
     margin-top: 1em;
-    height: 1.4em;
+    height: auto;
     width: 80%;
     color: #273444;
-    background-color: #f4f0e0;
+    background-color: #c2c0c8;
     box-shadow: #353232 2px 4px 6px;
     padding: 0.5em;
+    max-height: 19em;
+    overflow: scroll;
+}
+
+#notes .note {
+    background-color: #eeebe4;
+    padding: 0.2em;
+    line-break: strict;
+    overflow-wrap: anywhere;
 }
 
 #notes .note-row {
     display: grid;
     grid-template-columns: auto 2em;
+    gap: 0.3em;
+    margin-top: 0.3em;
+    height: auto;
 }
     

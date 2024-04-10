@@ -4,7 +4,7 @@
 - [x] switch position
 - [x] patchbay
 - [x] slider for curve
-- [ ] notes taking
+- [x] notes taking
 - [ ] dump model in local storage
 - [ ] load model from local storagge
 - [ ] ouput to text
