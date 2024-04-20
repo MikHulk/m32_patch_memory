@@ -5,31 +5,46 @@ import Browser
 import Html
 import Html.Attributes as HtmlA
 import Html.Events as HtmlE
-import Json.Decode exposing (Decoder)
+import Json.Decode as JsonD
+import Json.Encode as JsonE
 import Svg
 import Svg.Attributes as SvgA
 import Svg.Events as SvgE
 
 
-main : Program () Model Msg
+main : Program JsonE.Value Model Msg
 main =
     Browser.element
-        { init =
-            \_ ->
-                ( { device = mother32
-                  , selectedColor = "red"
-                  , patchesCurve = 1.7
-                  , notes =
-                        { newNote = ""
-                        , notes = []
-                        }
-                  }
-                , Cmd.none
-                )
+        { init = init
         , update = update
         , subscriptions = \_ -> Sub.none
         , view = view
         }
+
+
+init : JsonE.Value -> ( Model, Cmd Msg )
+init flags =
+    let
+        setups =
+            case JsonD.decodeValue setupsDecoder flags of
+                Ok setups_ ->
+                    List.sort setups_
+
+                Err _ ->
+                    []
+    in
+    ( { device = mother32
+      , selectedColor = "red"
+      , patchesCurve = 1.7
+      , notes =
+            { newNote = ""
+            , notes = []
+            }
+      , setups = setups
+      , dialog = None
+      }
+    , Cmd.none
+    )
 
 
 colors : List String
@@ -308,6 +323,8 @@ type alias Model =
     , selectedColor : String
     , patchesCurve : Float
     , notes : NotesModel
+    , setups : List String
+    , dialog : Dialog
     }
 
 
@@ -364,6 +381,12 @@ type alias Device =
 type Direction
     = Up
     | Down
+
+
+type Dialog
+    = LoadBox
+    | SaveBox
+    | None
 
 
 type Parameter
@@ -448,6 +471,9 @@ type Msg
     | UserSelectColor String
     | UserChangeCurve (Maybe Float)
     | UserNote NoteMsg
+    | UserCloseModal
+    | UserOpenLoadBox
+    | UserSelectSetup String
     | GotKnobRect Parameter BoundingClientRect
 
 
@@ -604,18 +630,14 @@ update msg model =
         UserSelectColor color ->
             ( { model | selectedColor = color }, Cmd.none )
 
-        GotKnobRect param rect ->
-            let
-                knobs =
-                    updateKnob
-                        model.device.knobs
-                        param
-                        (\knob_ -> { knob_ | geo = Just rect })
+        UserCloseModal ->
+            ( { model | dialog = None }, Cmd.none )
 
-                device =
-                    model.device
-            in
-            ( { model | device = { device | knobs = knobs } }, Cmd.none )
+        UserSelectSetup setup ->
+            ( { model | dialog = None }, Cmd.none )
+
+        UserOpenLoadBox ->
+            ( { model | dialog = LoadBox }, Cmd.none )
 
         UserChangeCurve curveOpt ->
             case curveOpt of
@@ -631,6 +653,19 @@ update msg model =
                     noteUpdate noteMsg model.notes
             in
             ( { model | notes = notesModel }, cmd )
+
+        GotKnobRect param rect ->
+            let
+                knobs =
+                    updateKnob
+                        model.device.knobs
+                        param
+                        (\knob_ -> { knob_ | geo = Just rect })
+
+                device =
+                    model.device
+            in
+            ( { model | device = { device | knobs = knobs } }, Cmd.none )
 
 
 noteUpdate : NoteMsg -> NotesModel -> ( NotesModel, Cmd Msg )
@@ -715,6 +750,7 @@ knobUpdate param msg model =
 
 
 
+-- Subscriptions
 -- View
 
 
@@ -762,25 +798,81 @@ view model =
             in
             List.filterMap f <|
                 Al.toList device.patches
-    in
-    Html.div []
-        [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
-        , Html.div
-            [ HtmlA.id "device" ]
-            [ Svg.svg
-                [ SvgA.viewBox "0 0 900 380"
+
+        common =
+            [ Html.h1 [ HtmlA.id "header" ] [ Html.text "Mother 32 Patch Memory" ]
+            , Html.div
+                [ HtmlA.id "device" ]
+                [ Svg.svg
+                    [ SvgA.viewBox "0 0 900 380"
+                    ]
+                  <|
+                    devicePicture
+                        ++ knobsSvg
+                        ++ switchesSvg
+                        ++ patchSvg
+                        ++ jackInSvg
+                        ++ jackOutSvg
                 ]
-              <|
-                devicePicture
-                    ++ knobsSvg
-                    ++ switchesSvg
-                    ++ patchSvg
-                    ++ jackInSvg
-                    ++ jackOutSvg
+            , controlView model
+            , noteListView model.notes
             ]
-        , controlView model
-        , noteListView model.notes
+
+        mainAttrs = []
+    in
+    Html.div mainAttrs <|
+        case model.dialog of
+            LoadBox ->
+                loadBox model.setups :: common
+
+            _ ->
+                common
+
+
+modal : String -> List (Html.Html Msg) -> Html.Html Msg
+modal title content =
+    Html.div
+        [ HtmlA.attribute "class" "modal-bg"
         ]
+        [ Html.node "dialog"
+            [ HtmlA.attribute "open" "1"
+            , HtmlA.attribute "class" "modal"
+            , HtmlA.style "padding" "0"
+            ]
+            [ Html.div
+                [ HtmlA.style "display" "flex"
+                , HtmlA.attribute "class" "modal-title"
+                ]
+                [ Html.h1
+                    [ HtmlA.style "margin" "0"
+                    , HtmlA.style "width" "100%"
+                    ]
+                    [ Html.text title ]
+                , removeButton [ HtmlE.onClick <| UserCloseModal ]
+                ]
+            , Html.div
+                [ HtmlA.attribute "class" "modal-content"
+                , HtmlA.style "overflow-y" "scroll"
+                ]
+                content
+            ]
+        ]
+
+
+setupElem : String -> Html.Html Msg
+setupElem setupName =
+    Html.div
+        [ HtmlA.style "cursor" "pointer"
+        , HtmlA.attribute "class" "setup-elem"
+        , HtmlE.onClick <| UserSelectSetup setupName
+        ]
+        [ Html.text setupName ]
+
+
+loadBox : List String -> Html.Html Msg
+loadBox setups =
+    modal "Select a setup" <|
+        List.map setupElem setups
 
 
 noteView : Int -> String -> Html.Html Msg
@@ -847,7 +939,7 @@ controlView model =
             ]
             []
         , Html.button
-            []
+            [ HtmlE.onClick UserOpenLoadBox ]
             [ Html.text "Load" ]
         , Html.button
             []
@@ -1153,7 +1245,7 @@ addButton attrs =
     let
         m =
             2.5
-        
+
         r =
             9.0
 
@@ -1166,6 +1258,7 @@ addButton attrs =
     Svg.svg
         ([ SvgA.height <| String.fromFloat <| r * 2.0 + m * 2.0
          , SvgA.width <| String.fromFloat <| r * 2.0 + m * 2.0
+         , SvgA.cursor "pointer"
          ]
             ++ attrs
         )
@@ -1220,6 +1313,7 @@ removeButton attrs =
     Svg.svg
         ([ SvgA.height <| String.fromFloat <| r * 2.0 + m * 2.0
          , SvgA.width <| String.fromFloat <| r * 2.0 + m * 2.0
+         , SvgA.cursor "pointer"
          ]
             ++ attrs
         )
@@ -1269,31 +1363,36 @@ onMove msg =
 -- Decoder
 
 
-getBoundingClientRect : (BoundingClientRect -> Msg) -> Decoder Msg
+getBoundingClientRect : (BoundingClientRect -> Msg) -> JsonD.Decoder Msg
 getBoundingClientRect msg =
-    Json.Decode.at [ "target", "boundingClientRect" ] boundingClientRectDecoder
-        |> Json.Decode.map msg
+    JsonD.at [ "target", "boundingClientRect" ] boundingClientRectDecoder
+        |> JsonD.map msg
 
 
-boundingClientRectDecoder : Decoder BoundingClientRect
+boundingClientRectDecoder : JsonD.Decoder BoundingClientRect
 boundingClientRectDecoder =
-    Json.Decode.map8 BoundingClientRect
-        (Json.Decode.field "x" Json.Decode.float)
-        (Json.Decode.field "y" Json.Decode.float)
-        (Json.Decode.field "width" Json.Decode.float)
-        (Json.Decode.field "height" Json.Decode.float)
-        (Json.Decode.field "top" Json.Decode.float)
-        (Json.Decode.field "right" Json.Decode.float)
-        (Json.Decode.field "bottom" Json.Decode.float)
-        (Json.Decode.field "left" Json.Decode.float)
+    JsonD.map8 BoundingClientRect
+        (JsonD.field "x" JsonD.float)
+        (JsonD.field "y" JsonD.float)
+        (JsonD.field "width" JsonD.float)
+        (JsonD.field "height" JsonD.float)
+        (JsonD.field "top" JsonD.float)
+        (JsonD.field "right" JsonD.float)
+        (JsonD.field "bottom" JsonD.float)
+        (JsonD.field "left" JsonD.float)
 
 
-positionDecoder : (( Float, Float ) -> Msg) -> Json.Decode.Decoder Msg
+positionDecoder : (( Float, Float ) -> Msg) -> JsonD.Decoder Msg
 positionDecoder msg =
-    Json.Decode.map2 Tuple.pair
-        (Json.Decode.field "screenX" Json.Decode.float)
-        (Json.Decode.field "screenY" Json.Decode.float)
-        |> Json.Decode.map msg
+    JsonD.map2 Tuple.pair
+        (JsonD.field "screenX" JsonD.float)
+        (JsonD.field "screenY" JsonD.float)
+        |> JsonD.map msg
+
+
+setupsDecoder : JsonD.Decoder (List String)
+setupsDecoder =
+    JsonD.list JsonD.string
 
 
 

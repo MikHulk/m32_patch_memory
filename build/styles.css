@@ -74,4 +74,49 @@ html {
     margin-top: 0.3em;
     height: auto;
 }
-    
+ 
+.modal-bg {
+    background-color: #2d2d2ac7;
+    position: fixed;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    left: 0;
+}
+
+.modal-title > h1 {
+    font-size: 1em;
+}
+
+.modal-title {
+    background-color: #68687B;
+    color: gainsboro;
+    border-bottom: solid #494c51 1px;
+    border-radius: 2px 2px 0px 0px;
+    padding: 0.5em;
+}
+
+.modal-content {
+    max-height: 201px;
+    margin: 0.3em;
+}
+
+.modal {
+    background-color: beige;
+    border: 2px solid #204779;
+    border-radius: 5px;
+    position: fixed;
+    z-index: 2;
+    height: 250px;
+    width: 400px;
+    transform: translateY(50%);
+    box-shadow: #353232 4px 4px 6px;
+}
+
+.setup-elem {
+    margin-top: 2px;
+    background-color: #b9b9b9;
+    overflow-wrap: anywhere;
+    padding: 5px;
+}

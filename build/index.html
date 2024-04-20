@@ -11,6 +11,9 @@
 
     <script>
       
+      var savedSetups = localStorage.getItem('setups');
+      var flags = savedSetups ? JSON.parse(savedSetups) : null ;
+      
       Object.defineProperty(Element.prototype, 'boundingClientRect', {
         configurable: false,
         enumerable: true,
@@ -20,7 +23,8 @@
       });
       
       var app = Elm.Main.init({
-        node: document.getElementById('app')
+        node: document.getElementById('app'),
+        flags: flags,
       });
 
     </script>
