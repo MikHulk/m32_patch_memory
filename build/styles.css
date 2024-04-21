@@ -131,7 +131,7 @@ html {
 #manage-box-input {
     margin-top: 0.4em;
     display: grid;
-    grid-template-columns: auto 1.6em;
+    grid-template-columns: auto 1.55em;
     width: 100%;
     gap: 0.2em;
 }
@@ -145,6 +145,7 @@ html {
     display: grid;
     grid-template-columns: auto 2em;
     gap: 0.3em;
+    padding-right:1px;
 }
 
 #manage-box-list {

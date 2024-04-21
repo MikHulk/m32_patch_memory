@@ -649,7 +649,7 @@ update msg model =
         UserDeleteSetup id ->
             let
                 setups =
-                    { newSetup = model.setups.newSetup
+                    { newSetup = ""
                     , setups =
                         List.take id model.setups.setups
                             ++ List.drop (id + 1) model.setups.setups
@@ -926,13 +926,14 @@ manageBoxSetupElem id setupName =
         [ HtmlA.style "cursor" "pointer"
         , HtmlA.class "setup-elem"
         , HtmlA.class "manage-box-setup-elem"
-        , HtmlE.onClick <| UserUpdateNewSetup setupName
         ]
-        [ Html.text setupName
+        [ Html.div
+            [ HtmlE.onClick <| UserUpdateNewSetup setupName ]
+            [ Html.text setupName ]
         , removeButton
-              [ HtmlE.onClick <| UserDeleteSetup id
-              , HtmlA.style "margin-top" "-1px"
-              ]
+            [ HtmlE.onClick <| UserDeleteSetup id
+            , HtmlA.style "margin-top" "-1px"
+            ]
         ]
 
 
@@ -962,7 +963,7 @@ manageBox model =
         [ setupList
             [ HtmlA.id "manage-box-list" ]
           <|
-            List.indexedMap manageBoxSetupElem  model.setups
+            List.indexedMap manageBoxSetupElem model.setups
         , Html.div
             [ HtmlA.id "manage-box-input"
             ]
