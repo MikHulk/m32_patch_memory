@@ -6,5 +6,6 @@
             ],
             "output": "build/main.js"
         }
-    }
+    },
+    "serve": "./build"
 }

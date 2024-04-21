@@ -40,7 +40,7 @@ init flags =
             { newNote = ""
             , notes = []
             }
-      , setups = setups
+      , setups = { newSetup = "", setups = setups }
       , dialog = None
       }
     , Cmd.none
@@ -323,8 +323,14 @@ type alias Model =
     , selectedColor : String
     , patchesCurve : Float
     , notes : NotesModel
-    , setups : List String
+    , setups : SetupModel
     , dialog : Dialog
+    }
+
+
+type alias SetupModel =
+    { newSetup : String
+    , setups : List String
     }
 
 
@@ -385,7 +391,7 @@ type Direction
 
 type Dialog
     = LoadBox
-    | SaveBox
+    | ManageBox
     | None
 
 
@@ -473,7 +479,11 @@ type Msg
     | UserNote NoteMsg
     | UserCloseModal
     | UserOpenLoadBox
+    | UserOpenManageBox
     | UserSelectSetup String
+    | UserUpdateNewSetup String
+    | UserDeleteSetup Int
+    | UserCommitNewSetup
     | GotKnobRect Parameter BoundingClientRect
 
 
@@ -636,8 +646,42 @@ update msg model =
         UserSelectSetup setup ->
             ( { model | dialog = None }, Cmd.none )
 
+        UserDeleteSetup id ->
+            let
+                setups =
+                    { newSetup = model.setups.newSetup
+                    , setups =
+                        List.take id model.setups.setups
+                            ++ List.drop (id + 1) model.setups.setups
+                    }
+            in
+            ( { model | setups = setups }, Cmd.none )
+
+        UserUpdateNewSetup setup ->
+            ( { model
+                | setups =
+                    { setups = model.setups.setups
+                    , newSetup = setup
+                    }
+              }
+            , Cmd.none
+            )
+
+        UserCommitNewSetup ->
+            ( { model
+                | setups =
+                    { setups = model.setups.newSetup :: model.setups.setups
+                    , newSetup = ""
+                    }
+              }
+            , Cmd.none
+            )
+
         UserOpenLoadBox ->
             ( { model | dialog = LoadBox }, Cmd.none )
+
+        UserOpenManageBox ->
+            ( { model | dialog = ManageBox }, Cmd.none )
 
         UserChangeCurve curveOpt ->
             case curveOpt of
@@ -818,12 +862,16 @@ view model =
             , noteListView model.notes
             ]
 
-        mainAttrs = []
+        mainAttrs =
+            []
     in
     Html.div mainAttrs <|
         case model.dialog of
             LoadBox ->
                 loadBox model.setups :: common
+
+            ManageBox ->
+                manageBox model.setups :: common
 
             _ ->
                 common
@@ -832,47 +880,101 @@ view model =
 modal : String -> List (Html.Html Msg) -> Html.Html Msg
 modal title content =
     Html.div
-        [ HtmlA.attribute "class" "modal-bg"
+        [ HtmlA.class "modal-bg"
         ]
         [ Html.node "dialog"
             [ HtmlA.attribute "open" "1"
-            , HtmlA.attribute "class" "modal"
+            , HtmlA.class "modal"
             , HtmlA.style "padding" "0"
             ]
             [ Html.div
                 [ HtmlA.style "display" "flex"
-                , HtmlA.attribute "class" "modal-title"
+                , HtmlA.class "modal-title"
                 ]
                 [ Html.h1
                     [ HtmlA.style "margin" "0"
                     , HtmlA.style "width" "100%"
                     ]
                     [ Html.text title ]
-                , removeButton [ HtmlE.onClick <| UserCloseModal ]
+                , removeButton
+                    [ HtmlE.onClick <| UserCloseModal
+                    , HtmlA.style "margin-top" "0px"
+                    ]
                 ]
             , Html.div
-                [ HtmlA.attribute "class" "modal-content"
-                , HtmlA.style "overflow-y" "scroll"
+                [ HtmlA.class "modal-content"
+                , HtmlA.style "overflow-y" "clip"
                 ]
                 content
             ]
         ]
 
 
-setupElem : String -> Html.Html Msg
-setupElem setupName =
+loadBoxSetupElem : String -> Html.Html Msg
+loadBoxSetupElem setupName =
     Html.div
         [ HtmlA.style "cursor" "pointer"
-        , HtmlA.attribute "class" "setup-elem"
+        , HtmlA.class "setup-elem"
         , HtmlE.onClick <| UserSelectSetup setupName
         ]
         [ Html.text setupName ]
 
 
-loadBox : List String -> Html.Html Msg
-loadBox setups =
+manageBoxSetupElem : Int -> String -> Html.Html Msg
+manageBoxSetupElem id setupName =
+    Html.div
+        [ HtmlA.style "cursor" "pointer"
+        , HtmlA.class "setup-elem"
+        , HtmlA.class "manage-box-setup-elem"
+        , HtmlE.onClick <| UserUpdateNewSetup setupName
+        ]
+        [ Html.text setupName
+        , removeButton
+              [ HtmlE.onClick <| UserDeleteSetup id
+              , HtmlA.style "margin-top" "-1px"
+              ]
+        ]
+
+
+setupList :
+    List (Html.Attribute Msg)
+    -> List (Html.Html Msg)
+    -> Html.Html Msg
+setupList attrs content =
+    Html.div
+        (HtmlA.class "setup-list" :: attrs)
+        content
+
+
+loadBox : SetupModel -> Html.Html Msg
+loadBox model =
     modal "Select a setup" <|
-        List.map setupElem setups
+        [ setupList
+            [ HtmlA.id "load-box-list" ]
+          <|
+            List.map loadBoxSetupElem model.setups
+        ]
+
+
+manageBox : SetupModel -> Html.Html Msg
+manageBox model =
+    modal "Manage your setup" <|
+        [ setupList
+            [ HtmlA.id "manage-box-list" ]
+          <|
+            List.indexedMap manageBoxSetupElem  model.setups
+        , Html.div
+            [ HtmlA.id "manage-box-input"
+            ]
+            [ Html.input
+                [ HtmlE.onInput UserUpdateNewSetup
+                , HtmlA.placeholder "Enter a name for your setup here"
+                , HtmlA.value model.newSetup
+                ]
+                []
+            , addButton [ HtmlE.onClick UserCommitNewSetup ]
+            ]
+        ]
 
 
 noteView : Int -> String -> Html.Html Msg
@@ -942,8 +1044,8 @@ controlView model =
             [ HtmlE.onClick UserOpenLoadBox ]
             [ Html.text "Load" ]
         , Html.button
-            []
-            [ Html.text "Save" ]
+            [ HtmlE.onClick UserOpenManageBox ]
+            [ Html.text "Manage" ]
         , Html.button
             []
             [ Html.text "To text" ]

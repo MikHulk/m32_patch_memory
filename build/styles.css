@@ -98,20 +98,25 @@ html {
 }
 
 .modal-content {
-    max-height: 201px;
+    max-height: 85.3%;
     margin: 0.3em;
+    margin-top: 0;
 }
 
 .modal {
     background-color: beige;
-    border: 2px solid #204779;
+    border: 2px solid #112742;
     border-radius: 5px;
     position: fixed;
     z-index: 2;
-    height: 250px;
+    height: 296px;
     width: 400px;
     transform: translateY(50%);
     box-shadow: #353232 4px 4px 6px;
+}
+
+:root {
+  --default-line-height: 19px;
 }
 
 .setup-elem {
@@ -119,4 +124,33 @@ html {
     background-color: #b9b9b9;
     overflow-wrap: anywhere;
     padding: 5px;
+    line-height: var(--default-line-height);
+    scroll-snap-stop: normal;
+}
+
+#manage-box-input {
+    margin-top: 0.4em;
+    display: grid;
+    grid-template-columns: auto 1.6em;
+    width: 100%;
+    gap: 0.2em;
+}
+
+.setup-list {
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+}
+
+.manage-box-setup-elem {
+    display: grid;
+    grid-template-columns: auto 2em;
+    gap: 0.3em;
+}
+
+#manage-box-list {
+    height: 75%;
+}
+
+#load-box-list {
+    height: 86%;
 }
