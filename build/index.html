@@ -14,13 +14,17 @@
       var savedSetups = localStorage.getItem(register);
       var savedSetups = savedSetups ? JSON.parse(savedSetups) : [];
       
-      Object.defineProperty(Element.prototype, 'boundingClientRect', {
-        configurable: false,
-        enumerable: true,
-        get() {
-          return this.getBoundingClientRect()
+      Object.defineProperty(
+        Element.prototype,
+        'boundingClientRect',
+        {
+          configurable: false,
+          enumerable: true,
+          get() {
+            return this.getBoundingClientRect()
+          }
         }
-      });
+      );
       
       var app = Elm.Main.init({
         node: document.getElementById('app'),
@@ -50,7 +54,18 @@
           app.ports.setupListReceiver.send(savedSetups);
         }
       );
-      console.log(app.ports);
+
+      app.ports.loadSetup.subscribe(
+        function(key) {
+          console.log("load", key);
+          var savedSetup = localStorage.getItem(key);
+          var savedSetup = savedSetup ? JSON.parse(savedSetup) : null;
+          console.log(savedSetup);
+          app.ports.setupReceiver.send(savedSetup);
+        }
+      );
+          
+          console.log(app.ports);
     </script>
     
     

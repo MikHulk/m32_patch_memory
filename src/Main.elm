@@ -207,7 +207,7 @@ mother32 =
           , isSelected = False
           }
         , { position = ( 769, 157 )
-          , boundTo = LfoRate
+          , boundTo = LfoRateIn
           , isSelected = False
           }
         , { position = ( 729.5, 196 )
@@ -367,6 +367,31 @@ type alias Device =
     }
 
 
+type alias KnobSetup =
+    { parameter : String, value : Float }
+
+
+type alias SwitchSetup =
+    { parameter : String, direction : String }
+
+
+type alias PatchSetup =
+    { in_ : String, out : String, color : String }
+
+
+type alias DeviceSetup =
+    { knobs : List KnobSetup
+    , switches : List SwitchSetup
+    , patches : List PatchSetup
+    }
+
+
+type alias Setup =
+    { device : DeviceSetup
+    , notes : List String
+    }
+
+
 type alias BoundingClientRect =
     { x : Float
     , y : Float
@@ -477,10 +502,12 @@ type Msg
     | UserOpenManageBox
     | UserSelectSetup String
     | UserUpdateNewSetup String
-    | UserDeleteSetup String
     | UserCommitNewSetup
+    | UserUpdateSetup String
+    | UserDeleteSetup String
     | GotKnobRect Parameter BoundingClientRect
-    | ReceiveNewSetupList JsonE.Value
+    | ReceiveSetupList JsonE.Value
+    | ReceiveSetup JsonE.Value
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -636,41 +663,6 @@ update msg model =
         UserSelectColor color ->
             ( { model | selectedColor = color }, Cmd.none )
 
-        UserCloseModal ->
-            ( { model | dialog = None }, Cmd.none )
-
-        UserSelectSetup setup ->
-            ( { model | dialog = None }, Cmd.none )
-
-        UserDeleteSetup name ->
-            ( model, Cmd.batch [ removeSetup name ] )
-
-        UserUpdateNewSetup setup ->
-            ( { model
-                | setups =
-                    { setups = model.setups.setups
-                    , newSetup = setup
-                    }
-              }
-            , Cmd.none
-            )
-
-        UserCommitNewSetup ->
-            ( { model
-                | setups =
-                    { setups = model.setups.setups
-                    , newSetup = ""
-                    }
-              }
-            , Cmd.batch [ saveSetup ( model.setups.newSetup, encodeSetup model ) ]
-            )
-
-        UserOpenLoadBox ->
-            ( { model | dialog = LoadBox }, Cmd.none )
-
-        UserOpenManageBox ->
-            ( { model | dialog = ManageBox }, Cmd.none )
-
         UserChangeCurve curveOpt ->
             case curveOpt of
                 Just curve ->
@@ -686,6 +678,47 @@ update msg model =
             in
             ( { model | notes = notesModel }, cmd )
 
+        UserCloseModal ->
+            ( { model | dialog = None }, Cmd.none )
+
+        UserSelectSetup name ->
+            ( { model | dialog = None }, Cmd.batch [ loadSetup name ]  )
+
+        UserDeleteSetup name ->
+            ( model, Cmd.batch [ removeSetup name ] )
+
+        UserUpdateNewSetup name ->
+            ( { model
+                | setups =
+                    { setups = model.setups.setups
+                    , newSetup = name
+                    }
+              }
+            , Cmd.none
+            )
+
+        UserUpdateSetup name ->
+            ( { model | dialog = None }
+            , Cmd.batch [ saveSetup ( name, encodeSetup model ) ]
+            )
+
+        UserCommitNewSetup ->
+            ( { model
+                | setups =
+                    { setups = model.setups.setups
+                    , newSetup = ""
+                    }
+                , dialog = None
+              }
+            , Cmd.batch [ saveSetup ( model.setups.newSetup, encodeSetup model ) ]
+            )
+
+        UserOpenLoadBox ->
+            ( { model | dialog = LoadBox }, Cmd.none )
+
+        UserOpenManageBox ->
+            ( { model | dialog = ManageBox }, Cmd.none )
+
         GotKnobRect param rect ->
             let
                 knobs =
@@ -699,7 +732,7 @@ update msg model =
             in
             ( { model | device = { device | knobs = knobs } }, Cmd.none )
 
-        ReceiveNewSetupList value ->
+        ReceiveSetupList value ->
             ( { model
                 | setups =
                     { setups = getSetups value
@@ -708,6 +741,9 @@ update msg model =
               }
             , Cmd.none
             )
+
+        ReceiveSetup value ->
+            ( loadModel model value, Cmd.none )
 
 
 noteUpdate : NoteMsg -> NotesModel -> ( NotesModel, Cmd Msg )
@@ -801,7 +837,13 @@ port saveSetup : ( String, JsonE.Value ) -> Cmd msg
 port removeSetup : String -> Cmd msg
 
 
+port loadSetup : String -> Cmd msg
+
+
 port setupListReceiver : (JsonE.Value -> msg) -> Sub msg
+
+
+port setupReceiver : (JsonE.Value -> msg) -> Sub msg
 
 
 
@@ -810,7 +852,10 @@ port setupListReceiver : (JsonE.Value -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    setupListReceiver ReceiveNewSetupList
+    Sub.batch
+        [ setupListReceiver ReceiveSetupList
+        , setupReceiver ReceiveSetup
+        ]
 
 
 
@@ -947,7 +992,7 @@ manageBoxSetupElem setupName =
         , HtmlA.class "manage-box-setup-elem"
         ]
         [ Html.div
-            [ HtmlE.onClick <| UserUpdateNewSetup setupName ]
+            [ HtmlE.onClick <| UserUpdateSetup setupName ]
             [ Html.text setupName ]
         , removeButton
             [ HtmlE.onClick <| UserDeleteSetup setupName
@@ -1568,6 +1613,43 @@ setupsDecoder =
     JsonD.list JsonD.string
 
 
+knobDecoder : JsonD.Decoder KnobSetup
+knobDecoder =
+    JsonD.map2 KnobSetup
+        (JsonD.field "parameter" JsonD.string)
+        (JsonD.field "value" JsonD.float)
+
+
+switchDecoder : JsonD.Decoder SwitchSetup
+switchDecoder =
+    JsonD.map2 SwitchSetup
+        (JsonD.field "parameter" JsonD.string)
+        (JsonD.field "direction" JsonD.string)
+
+
+patchDecoder : JsonD.Decoder PatchSetup
+patchDecoder =
+    JsonD.map3 PatchSetup
+        (JsonD.field "in" JsonD.string)
+        (JsonD.field "out" JsonD.string)
+        (JsonD.field "color" JsonD.string)
+
+
+deviceDecoder : JsonD.Decoder DeviceSetup
+deviceDecoder =
+    JsonD.map3 DeviceSetup
+        (JsonD.field "knobs" <| JsonD.list knobDecoder)
+        (JsonD.field "switches" <| JsonD.list switchDecoder)
+        (JsonD.field "patches" <| JsonD.list patchDecoder)
+
+
+setupDecoder : JsonD.Decoder Setup
+setupDecoder =
+    JsonD.map2 Setup
+        (JsonD.field "device" deviceDecoder)
+        (JsonD.field "notes" <| JsonD.list JsonD.string)
+
+
 
 -- Utils
 
@@ -1580,6 +1662,196 @@ getSetups value =
 
         Err _ ->
             []
+
+
+mergeKnobs :
+    List Knob
+    -> List KnobSetup
+    -> List Knob
+mergeKnobs knobs setups =
+    List.map2
+        (\knob setup -> { knob | value = setup.value })
+        knobs
+        setups
+
+
+mergeSwitches :
+    List Switch
+    -> List SwitchSetup
+    -> List Switch
+mergeSwitches switches setups =
+    List.map2
+        (\switch setup ->
+            { switch
+                | direction =
+                    if setup.direction == "Up" then
+                        Up
+
+                    else
+                        Down
+            }
+        )
+        switches
+        setups
+
+
+processPatches :
+    List PatchSetup
+    -> Al.Dict ( Parameter, Parameter ) String
+processPatches setups =
+    let
+        fromString s =
+            case s of
+                "ExtAudio" ->
+                    Just ExtAudio
+
+                "MixCv" ->
+                    Just MixCv
+
+                "VcaCv" ->
+                    Just VcaCv
+
+                "VcfCutoff" ->
+                    Just VcfCutoff
+
+                "VcfRes" ->
+                    Just VcfRes
+
+                "Vco1vOct" ->
+                    Just Vco1vOct
+
+                "VcoLinFm" ->
+                    Just VcoLinFm
+
+                "VcoMod" ->
+                    Just VcoMod
+
+                "LfoRateIn" ->
+                    Just LfoRateIn
+
+                "Mix1" ->
+                    Just Mix1
+
+                "Mix2" ->
+                    Just Mix2
+
+                "VcMixCtrl" ->
+                    Just VcMixCtrl
+
+                "Mult" ->
+                    Just Mult
+
+                "GateIn" ->
+                    Just GateIn
+
+                "Tempo" ->
+                    Just Tempo
+
+                "RunStop" ->
+                    Just RunStop
+
+                "Reset" ->
+                    Just Reset
+
+                "Hold" ->
+                    Just Hold
+
+                "Vca" ->
+                    Just Vca
+
+                "Noise" ->
+                    Just Noise
+
+                "Vcf" ->
+                    Just Vcf
+
+                "VcoSaw" ->
+                    Just VcoSaw
+
+                "VcoPulse" ->
+                    Just VcoPulse
+
+                "LfoTri" ->
+                    Just LfoTri
+
+                "LfoSq" ->
+                    Just LfoSq
+
+                "VcMixOut" ->
+                    Just VcMixOut
+
+                "Mult1" ->
+                    Just Mult1
+
+                "Mult2" ->
+                    Just Mult2
+
+                "Assign" ->
+                    Just Assign
+
+                "Eg" ->
+                    Just Eg
+
+                "Kb" ->
+                    Just Kb
+
+                "GateOut" ->
+                    Just GateOut
+
+                _ ->
+                    Nothing
+    in
+    Al.fromList <|
+        List.filterMap
+            (\setup ->
+                case ( fromString setup.in_, fromString setup.out ) of
+                    ( Just in_, Just out ) ->
+                        Just ( ( in_, out ), setup.color )
+
+                    _ ->
+                        Nothing
+            )
+            setups
+
+
+loadModel : Model -> JsonE.Value -> Model
+loadModel model value =
+    case JsonD.decodeValue setupDecoder value of
+        Ok setup ->
+            let
+                notes =
+                    setup.notes
+
+                knobs =
+                    mergeKnobs model.device.knobs setup.device.knobs
+
+                switches =
+                    mergeSwitches model.device.switches setup.device.switches
+
+                patches =
+                    processPatches setup.device.patches
+
+                dev =
+                    model.device
+
+                device =
+                    { dev
+                        | knobs = knobs
+                        , switches = switches
+                        , patches = patches
+                    }
+
+                notes_ =
+                    model.notes
+            in
+            { model | notes = { notes_ | notes = notes }, device = device }
+
+        Err e ->
+            let
+                _ =
+                    Debug.log "error" <| Debug.toString e
+            in
+            model
 
 
 flip : (a -> b -> c) -> b -> a -> c
