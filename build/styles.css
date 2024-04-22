@@ -151,7 +151,7 @@ html {
 
 .manage-box-setup-elem {
   display: grid;
-  grid-template-columns: auto 2em;
+  grid-template-columns: auto 1.5em;
   gap: 0.3em;
   padding-right: 1px;
 }
