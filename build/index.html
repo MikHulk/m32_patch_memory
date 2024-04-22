@@ -10,9 +10,9 @@
     <div id="app"></div>
 
     <script>
-      
-      var savedSetups = localStorage.getItem('setups');
-      var flags = savedSetups ? JSON.parse(savedSetups) : null ;
+      const register = 'm32-setups';
+      var savedSetups = localStorage.getItem(register);
+      var savedSetups = savedSetups ? JSON.parse(savedSetups) : [];
       
       Object.defineProperty(Element.prototype, 'boundingClientRect', {
         configurable: false,
@@ -24,9 +24,33 @@
       
       var app = Elm.Main.init({
         node: document.getElementById('app'),
-        flags: flags,
+        flags: savedSetups
       });
 
+      app.ports.saveSetup.subscribe(
+        function([key, setup]) {
+          savedSetups = savedSetups.filter(k => k !== key);
+          savedSetups.push(key);
+          localStorage.setItem(key, JSON.stringify(setup));
+          localStorage.setItem(register, JSON.stringify(savedSetups));
+          console.log("received", key, setup);
+          app.ports.setupListReceiver.send(savedSetups);
+        }
+      );
+
+      app.ports.removeSetup.subscribe(
+        function(key) {
+          localStorage.removeItem(key);
+          savedSetups = savedSetups.filter(k => k !== key);
+          localStorage.setItem(
+            register,
+            JSON.stringify(savedSetups)
+          );
+          console.log("removed", key);
+          app.ports.setupListReceiver.send(savedSetups);
+        }
+      );
+      console.log(app.ports);
     </script>
     
     

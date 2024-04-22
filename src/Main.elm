@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import AssocList as Al
 import Browser
@@ -17,7 +17,7 @@ main =
     Browser.element
         { init = init
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
 
@@ -26,12 +26,7 @@ init : JsonE.Value -> ( Model, Cmd Msg )
 init flags =
     let
         setups =
-            case JsonD.decodeValue setupsDecoder flags of
-                Ok setups_ ->
-                    List.sort setups_
-
-                Err _ ->
-                    []
+            getSetups flags
     in
     ( { device = mother32
       , selectedColor = "red"
@@ -363,6 +358,15 @@ type alias Jack =
     }
 
 
+type alias Device =
+    { knobs : List Knob
+    , switches : List Switch
+    , inputs : List Jack
+    , outputs : List Jack
+    , patches : Al.Dict ( Parameter, Parameter ) String
+    }
+
+
 type alias BoundingClientRect =
     { x : Float
     , y : Float
@@ -372,15 +376,6 @@ type alias BoundingClientRect =
     , right : Float
     , bottom : Float
     , left : Float
-    }
-
-
-type alias Device =
-    { knobs : List Knob
-    , switches : List Switch
-    , inputs : List Jack
-    , outputs : List Jack
-    , patches : Al.Dict ( Parameter, Parameter ) String
     }
 
 
@@ -482,9 +477,10 @@ type Msg
     | UserOpenManageBox
     | UserSelectSetup String
     | UserUpdateNewSetup String
-    | UserDeleteSetup Int
+    | UserDeleteSetup String
     | UserCommitNewSetup
     | GotKnobRect Parameter BoundingClientRect
+    | ReceiveNewSetupList JsonE.Value
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -646,16 +642,8 @@ update msg model =
         UserSelectSetup setup ->
             ( { model | dialog = None }, Cmd.none )
 
-        UserDeleteSetup id ->
-            let
-                setups =
-                    { newSetup = ""
-                    , setups =
-                        List.take id model.setups.setups
-                            ++ List.drop (id + 1) model.setups.setups
-                    }
-            in
-            ( { model | setups = setups }, Cmd.none )
+        UserDeleteSetup name ->
+            ( model, Cmd.batch [ removeSetup name ] )
 
         UserUpdateNewSetup setup ->
             ( { model
@@ -670,11 +658,11 @@ update msg model =
         UserCommitNewSetup ->
             ( { model
                 | setups =
-                    { setups = model.setups.newSetup :: model.setups.setups
+                    { setups = model.setups.setups
                     , newSetup = ""
                     }
               }
-            , Cmd.none
+            , Cmd.batch [ saveSetup ( model.setups.newSetup, encodeSetup model ) ]
             )
 
         UserOpenLoadBox ->
@@ -710,6 +698,16 @@ update msg model =
                     model.device
             in
             ( { model | device = { device | knobs = knobs } }, Cmd.none )
+
+        ReceiveNewSetupList value ->
+            ( { model
+                | setups =
+                    { setups = getSetups value
+                    , newSetup = model.setups.newSetup
+                    }
+              }
+            , Cmd.none
+            )
 
 
 noteUpdate : NoteMsg -> NotesModel -> ( NotesModel, Cmd Msg )
@@ -794,7 +792,28 @@ knobUpdate param msg model =
 
 
 
+-- Ports
+
+
+port saveSetup : ( String, JsonE.Value ) -> Cmd msg
+
+
+port removeSetup : String -> Cmd msg
+
+
+port setupListReceiver : (JsonE.Value -> msg) -> Sub msg
+
+
+
 -- Subscriptions
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    setupListReceiver ReceiveNewSetupList
+
+
+
 -- View
 
 
@@ -863,9 +882,9 @@ view model =
             ]
 
         mainAttrs =
-            []
+            [ HtmlA.id "app" ]
     in
-    Html.div mainAttrs <|
+    Html.main_ mainAttrs <|
         case model.dialog of
             LoadBox ->
                 loadBox model.setups :: common
@@ -920,8 +939,8 @@ loadBoxSetupElem setupName =
         [ Html.text setupName ]
 
 
-manageBoxSetupElem : Int -> String -> Html.Html Msg
-manageBoxSetupElem id setupName =
+manageBoxSetupElem : String -> Html.Html Msg
+manageBoxSetupElem setupName =
     Html.div
         [ HtmlA.style "cursor" "pointer"
         , HtmlA.class "setup-elem"
@@ -931,7 +950,7 @@ manageBoxSetupElem id setupName =
             [ HtmlE.onClick <| UserUpdateNewSetup setupName ]
             [ Html.text setupName ]
         , removeButton
-            [ HtmlE.onClick <| UserDeleteSetup id
+            [ HtmlE.onClick <| UserDeleteSetup setupName
             , HtmlA.style "margin-top" "-1px"
             ]
         ]
@@ -944,7 +963,12 @@ setupList :
 setupList attrs content =
     Html.div
         (HtmlA.class "setup-list" :: attrs)
-        content
+    <|
+        if List.isEmpty content then
+            [ Html.text "found no setup." ]
+
+        else
+            content
 
 
 loadBox : SetupModel -> Html.Html Msg
@@ -963,7 +987,7 @@ manageBox model =
         [ setupList
             [ HtmlA.id "manage-box-list" ]
           <|
-            List.indexedMap manageBoxSetupElem model.setups
+            List.map manageBoxSetupElem model.setups
         , Html.div
             [ HtmlA.id "manage-box-input"
             ]
@@ -1463,6 +1487,52 @@ onMove msg =
 
 
 
+-- Encoder
+
+
+encodeKnob : Knob -> JsonE.Value
+encodeKnob knob =
+    JsonE.object
+        [ ( "parameter", JsonE.string <| Debug.toString knob.boundTo )
+        , ( "value", JsonE.float knob.value )
+        ]
+
+
+encodeSwitch : Switch -> JsonE.Value
+encodeSwitch switch =
+    JsonE.object
+        [ ( "parameter", JsonE.string <| Debug.toString switch.boundTo )
+        , ( "direction", JsonE.string <| Debug.toString switch.direction )
+        ]
+
+
+encodePatch : ( ( Parameter, Parameter ), String ) -> JsonE.Value
+encodePatch ( ( in_, out ), color ) =
+    JsonE.object
+        [ ( "in", JsonE.string <| Debug.toString in_ )
+        , ( "out", JsonE.string <| Debug.toString out )
+        , ( "color", JsonE.string color )
+        ]
+
+
+encodeDevice : Device -> JsonE.Value
+encodeDevice device =
+    JsonE.object
+        [ ( "knobs", JsonE.list encodeKnob device.knobs )
+        , ( "switches", JsonE.list encodeSwitch device.switches )
+        , ( "patches", JsonE.list encodePatch <| Al.toList device.patches )
+        ]
+
+
+encodeSetup : Model -> JsonE.Value
+encodeSetup model =
+    JsonE.object
+        [ ( "device", encodeDevice model.device )
+        , ( "notes", JsonE.list JsonE.string model.notes.notes )
+        ]
+
+
+
 -- Decoder
 
 
@@ -1500,6 +1570,16 @@ setupsDecoder =
 
 
 -- Utils
+
+
+getSetups : JsonE.Value -> List String
+getSetups value =
+    case JsonD.decodeValue setupsDecoder value of
+        Ok setups_ ->
+            List.sort setups_
+
+        Err _ ->
+            []
 
 
 flip : (a -> b -> c) -> b -> a -> c
