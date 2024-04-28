@@ -37,7 +37,6 @@
           savedSetups.push(key);
           localStorage.setItem(key, JSON.stringify(setup));
           localStorage.setItem(register, JSON.stringify(savedSetups));
-          console.log("received", key, setup);
           app.ports.setupListReceiver.send(savedSetups);
         }
       );
@@ -50,22 +49,18 @@
             register,
             JSON.stringify(savedSetups)
           );
-          console.log("removed", key);
           app.ports.setupListReceiver.send(savedSetups);
         }
       );
 
       app.ports.loadSetup.subscribe(
         function(key) {
-          console.log("load", key);
           var savedSetup = localStorage.getItem(key);
           var savedSetup = savedSetup ? JSON.parse(savedSetup) : null;
-          console.log(savedSetup);
           app.ports.setupReceiver.send(savedSetup);
         }
       );
           
-          console.log(app.ports);
     </script>
     
     
