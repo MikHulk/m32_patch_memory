@@ -682,7 +682,7 @@ update msg model =
             ( { model | dialog = None }, Cmd.none )
 
         UserSelectSetup name ->
-            ( { model | dialog = None }, Cmd.batch [ loadSetup name ]  )
+            ( { model | dialog = None }, Cmd.batch [ loadSetup name ] )
 
         UserDeleteSetup name ->
             ( model, Cmd.batch [ removeSetup name ] )
@@ -1538,7 +1538,7 @@ onMove msg =
 encodeKnob : Knob -> JsonE.Value
 encodeKnob knob =
     JsonE.object
-        [ ( "parameter", JsonE.string <| Debug.toString knob.boundTo )
+        [ ( "parameter", JsonE.string <| paramToString knob.boundTo )
         , ( "value", JsonE.float knob.value )
         ]
 
@@ -1546,16 +1546,16 @@ encodeKnob knob =
 encodeSwitch : Switch -> JsonE.Value
 encodeSwitch switch =
     JsonE.object
-        [ ( "parameter", JsonE.string <| Debug.toString switch.boundTo )
-        , ( "direction", JsonE.string <| Debug.toString switch.direction )
+        [ ( "parameter", JsonE.string <| paramToString switch.boundTo )
+        , ( "direction", JsonE.string <| directionToString switch.direction )
         ]
 
 
 encodePatch : ( ( Parameter, Parameter ), String ) -> JsonE.Value
 encodePatch ( ( in_, out ), color ) =
     JsonE.object
-        [ ( "in", JsonE.string <| Debug.toString in_ )
-        , ( "out", JsonE.string <| Debug.toString out )
+        [ ( "in", JsonE.string <| paramToString in_ )
+        , ( "out", JsonE.string <| paramToString out )
         , ( "color", JsonE.string color )
         ]
 
@@ -1847,10 +1847,6 @@ loadModel model value =
             { model | notes = { notes_ | notes = notes }, device = device }
 
         Err e ->
-            let
-                _ =
-                    Debug.log "error" <| Debug.toString e
-            in
             model
 
 
@@ -2000,3 +1996,182 @@ posToValue knob ( mouseX, mouseY ) =
                 posFromCenter
     in
     Maybe.map (rotate -2.03 >> toClockWise >> angleToValue) angle
+
+
+paramToString : Parameter -> String
+paramToString param =
+    case param of
+        Frequency ->
+            "Frequency"
+
+        PulseWidth ->
+            "PulseWidth"
+
+        Mix ->
+            "Mix"
+
+        Cutoff ->
+            "Cutoff"
+
+        Resonance ->
+            "Resonance"
+
+        Volume ->
+            "Volume"
+
+        Glide ->
+            "Glide"
+
+        VcoModAmount ->
+            "VcoModAmount"
+
+        VcfModAmount ->
+            "VcfModAmount"
+
+        TempoGate ->
+            "TempoGate"
+
+        LfoRate ->
+            "LfoRate"
+
+        Attack ->
+            "Attack"
+
+        Decay ->
+            "Decay"
+
+        VcMix ->
+            "VcMix"
+
+        VcoWave ->
+            "VcoWave"
+
+        VcaMode ->
+            "VcaMode"
+
+        VcoModSource ->
+            "VcoModSource"
+
+        VcoModDest ->
+            "VcoModDest"
+
+        VcfMode ->
+            "VcfMode"
+
+        VcfModSource ->
+            "VcfModSource"
+
+        VcfModPolarity ->
+            "VcfModPolarity"
+
+        LfoWave ->
+            "LfoWave"
+
+        Sustain ->
+            "Sustain"
+
+        Vca ->
+            "Vca"
+
+        Noise ->
+            "Noise"
+
+        Vcf ->
+            "Vcf"
+
+        VcoSaw ->
+            "VcoSaw"
+
+        VcoPulse ->
+            "VcoPulse"
+
+        LfoTri ->
+            "LfoTri"
+
+        LfoSq ->
+            "LfoSq"
+
+        VcMixOut ->
+            "VcMixOut"
+
+        Mult1 ->
+            "Mult1"
+
+        Mult2 ->
+            "Mult2"
+
+        Assign ->
+            "Assign"
+
+        Eg ->
+            "Eg"
+
+        Kb ->
+            "Kb"
+
+        GateOut ->
+            "GateOut"
+
+        ExtAudio ->
+            "ExtAudio"
+
+        MixCv ->
+            "MixCv"
+
+        VcaCv ->
+            "VcaCv"
+
+        VcfCutoff ->
+            "VcfCutoff"
+
+        VcfRes ->
+            "VcfRes"
+
+        Vco1vOct ->
+            "Vco1vOct"
+
+        VcoLinFm ->
+            "VcoLinFm"
+
+        VcoMod ->
+            "VcoMod"
+
+        LfoRateIn ->
+            "LfoRateIn"
+
+        Mix1 ->
+            "Mix1"
+
+        Mix2 ->
+            "Mix2"
+
+        VcMixCtrl ->
+            "VcMixCtrl"
+
+        Mult ->
+            "Mult"
+
+        GateIn ->
+            "GateIn"
+
+        Tempo ->
+            "Tempo"
+
+        RunStop ->
+            "RunStop"
+
+        Reset ->
+            "Reset"
+
+        Hold ->
+            "Hold"
+
+
+directionToString : Direction -> String
+directionToString dir =
+    case dir of
+        Up ->
+            "Up"
+
+        Down ->
+            "Down"
